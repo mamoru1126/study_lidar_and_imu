@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 840 640" width="840" height="640" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 15px; fill: #1f2733; font-weight: 700; }
+    .s { font-size: 12px; fill: #586273; }
+    .row { font-size: 12px; fill: #8a93a3; letter-spacing: 0.08em; }
+    .box { fill: #ffffff; stroke: #c8ced8; stroke-width: 1.2; }
+    .e { stroke: #9aa3b0; stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#9aa3b0"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="840" height="640" fill="#ffffff"/>
+
+  <!-- row labels -->
+  <g class="row">
+    <text x="16" y="62">STEP 1</text><text x="16" y="80" class="s">数学の道具</text>
+    <text x="16" y="182">STEP 2</text><text x="16" y="200" class="s">センサの扱いと</text><text x="16" y="216" class="s">推定の枠組み</text>
+    <text x="16" y="302">STEP 3</text><text x="16" y="320" class="s">ウィンドウ最適化</text>
+    <text x="16" y="422">STEP 4</text><text x="16" y="440" class="s">組み合わせて</text><text x="16" y="456" class="s">自己位置推定</text>
+    <text x="16" y="542">STEP 5</text><text x="16" y="560" class="s">論文とコードへ</text>
+  </g>
+  <line x1="130" y1="30" x2="130" y2="590" stroke="#e6e9ef" stroke-width="1"/>
+  <g transform="translate(110,0)">
+  <!-- edges (drawn first) -->
+  <path d="M245,100 C245,125 130,125 130,150" class="e"/>
+  <path d="M245,100 C245,125 360,125 360,150" class="e"/>
+  <path d="M475,100 C475,130 150,120 150,150" class="e"/>
+  <path d="M475,100 C475,125 380,125 380,150" class="e"/>
+  <path d="M475,100 C475,125 590,125 590,150" class="e"/>
+  <path d="M590,220 L590,270" class="e"/>
+  <path d="M130,220 C130,330 330,330 340,390" class="e"/>
+  <path d="M360,220 C360,300 360,300 360,390" class="e"/>
+  <path d="M590,340 C590,365 380,365 380,390" class="e"/>
+  <path d="M360,460 C360,485 245,485 245,510" class="e"/>
+  <path d="M345,545 L372,545" class="e"/>
+
+  <!-- row 1 -->
+  <rect x="145" y="36" width="200" height="64" rx="8" class="box"/>
+  <rect x="145" y="36" width="6" height="64" fill="#586273"/>
+  <text x="162" y="62" class="t">01 座標と回転</text>
+  <text x="162" y="84" class="s">SO(3), SE(3), Lie 群, 摂動</text>
+
+  <rect x="375" y="36" width="200" height="64" rx="8" class="box"/>
+  <rect x="375" y="36" width="6" height="64" fill="#586273"/>
+  <text x="392" y="62" class="t">02 確率と最小二乗</text>
+  <text x="392" y="84" class="s">ガウス分布, GN 法, LM 法</text>
+
+  <!-- row 2 -->
+  <rect x="30" y="156" width="200" height="64" rx="8" class="box"/>
+  <rect x="30" y="156" width="6" height="64" fill="#2a78d6"/>
+  <text x="47" y="182" class="t">03 スキャンマッチング</text>
+  <text x="47" y="204" class="s">ICP, NDT, GICP, VGICP</text>
+
+  <rect x="260" y="156" width="200" height="64" rx="8" class="box"/>
+  <rect x="260" y="156" width="6" height="64" fill="#eb6834"/>
+  <text x="277" y="182" class="t">04 IMU と事前積分</text>
+  <text x="277" y="204" class="s">バイアス, ドリフト, ΔR Δv Δp</text>
+
+  <rect x="490" y="156" width="200" height="64" rx="8" class="box"/>
+  <rect x="490" y="156" width="6" height="64" fill="#6250d6"/>
+  <text x="507" y="182" class="t">05 ファクターグラフ</text>
+  <text x="507" y="204" class="s">因子, スパース性, GTSAM</text>
+
+  <!-- row 3 -->
+  <rect x="490" y="276" width="200" height="64" rx="8" class="box"/>
+  <rect x="490" y="276" width="6" height="64" fill="#6250d6"/>
+  <text x="507" y="302" class="t">06 固定ラグ平滑化</text>
+  <text x="507" y="324" class="s">周辺化, iSAM2, キーフレーム</text>
+
+  <!-- row 4 -->
+  <rect x="260" y="396" width="200" height="64" rx="8" class="box"/>
+  <rect x="260" y="396" width="6" height="64" fill="#1baf7a"/>
+  <text x="277" y="422" class="t">07 既知地図上の推定</text>
+  <text x="277" y="444" class="s">NDT, UKF, MCL との比較</text>
+
+  <!-- row 5 -->
+  <rect x="145" y="516" width="200" height="64" rx="8" class="box" stroke="#1f2733"/>
+  <rect x="145" y="516" width="6" height="64" fill="#1f2733"/>
+  <text x="162" y="542" class="t">08 論文精読ガイド</text>
+  <text x="162" y="564" class="s">式・図・実験を読み解く</text>
+
+  <rect x="375" y="516" width="200" height="64" rx="8" class="box"/>
+  <rect x="375" y="516" width="6" height="64" fill="#1f2733"/>
+  <text x="392" y="542" class="t">09 著者のコード案内</text>
+  <text x="392" y="564" class="s">GLIM, gtsam_points ほか</text>
+
+  </g>
+  <text x="470" y="620" class="s" text-anchor="middle">各章に Python 演習 (exercises/) が対応しています。矢印は「先に読むと楽になる章」です。</text>
+</svg>

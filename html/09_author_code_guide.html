@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>著者のコード案内 | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html" aria-current="page"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 09 章</span><span class="chip math">コード</span><span class="chip time">目安 適宜</span></div>
+<h1 id="09-著者のコード案内-koide3-の-github">09. 著者のコード案内 (koide3 の GitHub)</h1>
+<p>論文著者の小出 健司さんは、研究成果の多くをオープンソースで公開しています (GitHub: <a href="https://github.com/koide3">koide3</a>)。
+この章では、論文の構成要素が <strong>どのリポジトリの、どのファイルにあるか</strong> を案内します。</p>
+<blockquote>
+<p><strong>注意</strong>
+調べた範囲では、この論文 (既知地図上の自己位置推定) の実装そのものは公開リポジトリには見当たりませんでした。
+ただし、論文のベースになっている LiDAR-IMU オドメトリは <strong>GLIM</strong> の中で公開されており、
+論文の因子 (VGICP 因子、IMU 因子、固定ラグ平滑化) は同じ部品で作られています。
+ファイル名・行の内容は 2026 年 10 月時点の <code>master</code> ブランチで確認したものです。</p>
+</blockquote>
+<hr />
+<h2 id="1-リポジトリの地図">1. リポジトリの地図</h2>
+<table>
+<thead>
+<tr>
+<th>リポジトリ</th>
+<th>役割</th>
+<th>論文との関係</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/koide3/glim">glim</a></td>
+<td>点群ベースの 3D 自己位置推定・地図作成フレームワーク (SLAM)</td>
+<td>論文のベース [5] のオドメトリを含む。最重要</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/gtsam_points">gtsam_points</a></td>
+<td>点群 SLAM 用の GTSAM 因子と最適化器 (旧名 gtsam_ext)</td>
+<td>VGICP 因子 (GPU 版含む)、固定ラグ平滑化の拡張</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/small_gicp">small_gicp</a></td>
+<td>高速な点群位置合わせライブラリ (C++/Python)</td>
+<td>ICP/GICP/VGICP を手軽に試せる</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/fast_gicp">fast_gicp</a></td>
+<td>GICP 系アルゴリズムの高速実装 (small_gicp の前身)</td>
+<td>VGICP の最初の実装</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/hdl_localization">hdl_localization</a></td>
+<td>UKF + NDT による既知地図上の自己位置推定 (ROS1)</td>
+<td>論文の比較手法の 1 つ</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/hdl_graph_slam">hdl_graph_slam</a></td>
+<td>ポーズグラフ SLAM (ROS1)</td>
+<td>地図作成の古典的な構成を学べる</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/glim_ext">glim_ext</a></td>
+<td>GLIM の拡張モジュール集 (ループ検出、GNSS など)</td>
+<td>GLIM にコールバックで機能を足す例</td>
+</tr>
+<tr>
+<td><a href="https://github.com/koide3/iridescence">iridescence</a></td>
+<td>3D 可視化ライブラリ</td>
+<td>GLIM のビューア</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-glim-の全体構成">2. GLIM の全体構成</h2>
+<p>GLIM は次のモジュールが別々のスレッドで動きます (GLIM 論文, RAS 2024)。</p>
+<ol>
+<li><strong>前処理</strong> (<code>src/glim/preprocess/</code>): ダウンサンプリング、近傍探索、共分散推定</li>
+<li><strong>オドメトリ推定</strong> (<code>src/glim/odometry/</code>): 固定ラグ平滑化による LiDAR-IMU オドメトリ ← <strong>論文のベース</strong></li>
+<li><strong>サブマッピング</strong> (<code>src/glim/mapping/sub_mapping*</code>): 数秒分のフレームをまとめたサブマップを作る</li>
+<li><strong>グローバルマッピング</strong> (<code>src/glim/mapping/global_mapping*</code>): サブマップ間のマッチングで全体の地図を最適化</li>
+</ol>
+<p>自己位置推定の論文に関係が深いのは 1 と 2 です。</p>
+<h2 id="3-論文の要素--glim--gtsam_points-のコード">3. 論文の要素 → GLIM / gtsam_points のコード</h2>
+<h3 id="31-状態と固定ラグ平滑化">3.1 状態と固定ラグ平滑化</h3>
+<p><code>src/glim/odometry/odometry_estimation_imu.cpp</code></p>
+<ul>
+<li>平滑化器の生成: <code>smoother.reset(new FixedLagSmootherExt(params-&gt;smoother_lag, isam2_params));</code></li>
+<li><code>FixedLagSmootherExt</code> の実体は <code>gtsam_points::IncrementalFixedLagSmootherExtWithFallback</code> (ヘッダ <code>odometry_estimation_imu.hpp</code>)</li>
+<li>状態のキー: <code>X(i)</code> 姿勢, <code>V(i)</code> 速度, <code>B(i)</code> IMU バイアス (<a href="04_imu_and_preintegration.html">04 章</a> の <span class="arithmatex">\(\mathbf{x}_i = [\mathbf{T}_i, \mathbf{v}_i, \mathbf{b}_i]\)</span>)</li>
+<li>最初の状態の固定: <code>LinearDampingFactor</code> (ゲージ自由度 = 座標系の原点の任意性を固定する)</li>
+</ul>
+<h3 id="32-imu-因子-fimathbfx_i-1-mathbfx_i">3.2 IMU 因子 <span class="arithmatex">\(f^I(\mathbf{x}_{i-1}, \mathbf{x}_i)\)</span></h3>
+<p>同じく <code>odometry_estimation_imu.cpp</code> の <code>insert_frame()</code> の中で、</p>
+<ul>
+<li><code>imu_integration-&gt;integrate_imu(...)</code>: 前フレームから今のフレームまでの IMU を事前積分</li>
+<li><code>imu_integration-&gt;integrated_measurements().predict(...)</code>: 事前積分で新しい状態を <strong>予測</strong> (最適化の初期値)</li>
+<li><code>gtsam::ImuFactor(X(last), V(last), X(current), V(current), B(last), ...)</code>: <strong>IMU 因子</strong></li>
+<li><code>gtsam::BetweenFactor&lt;gtsam::imuBias::ConstantBias&gt;(B(last), B(current), ...)</code>: バイアスのランダムウォーク因子</li>
+</ul>
+<h3 id="33-スキャンマッチング因子-fpmathbfx_i-mathbfx_j">3.3 スキャンマッチング因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span></h3>
+<p><code>src/glim/odometry/odometry_estimation_gpu.cpp</code> の <code>create_factors()</code></p>
+<div class="highlight"><pre><span></span><code><span class="c1">// There must be at least one factor between consecutive frames</span>
+<span class="k">for</span><span class="w"> </span><span class="p">(</span><span class="kt">int</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">current</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="n">params</span><span class="o">-&gt;</span><span class="n">full_connection_window_size</span><span class="p">;</span><span class="w"> </span><span class="n">target</span><span class="w"> </span><span class="o">&lt;</span><span class="w"> </span><span class="n">current</span><span class="p">;</span><span class="w"> </span><span class="n">target</span><span class="o">++</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<span class="w">  </span><span class="p">...</span>
+<span class="w">  </span><span class="n">create_binary_factor</span><span class="p">(</span><span class="n">factors</span><span class="p">,</span><span class="w"> </span><span class="n">X</span><span class="p">(</span><span class="n">target</span><span class="p">),</span><span class="w"> </span><span class="n">X</span><span class="p">(</span><span class="n">current</span><span class="p">),</span><span class="w"> </span><span class="n">frames</span><span class="p">[</span><span class="n">target</span><span class="p">],</span><span class="w"> </span><span class="n">frames</span><span class="p">[</span><span class="n">current</span><span class="p">]);</span>
+<span class="p">}</span>
+</code></pre></div>
+<ul>
+<li><code>full_connection_window_size</code> (設定ファイルの値 2): 最新フレームを <strong>直前の何フレームとつなぐか</strong>。
+  論文の <span class="arithmatex">\(\sum_{j=i-2}^{i-1}\)</span> に対応</li>
+<li><code>create_binary_factor</code> の中身は <code>gtsam_points::IntegratedVGICPFactorGPU(target_key, source_key, voxelmap, source-&gt;frame, ...)</code>。
+  ターゲットのボクセル地図の <strong>解像度レベルごとに 1 つ</strong> 因子を作る (マルチ解像度, <a href="03_point_cloud_registration.html">03 章</a>)</li>
+<li>続くループで <strong>キーフレーム</strong> とも因子を作る。キーフレームがウィンドウ外に出ていたら
+  <code>create_unary_factor</code> (キーフレームの姿勢を固定した単項因子) になる (<a href="06_fixed_lag_smoothing.html">06 章</a> 4 節)</li>
+</ul>
+<blockquote>
+<p><strong>地図マッチング因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathcal{M})\)</span> はどこ?</strong>
+GLIM のオドメトリには地図因子はありませんが、<code>create_unary_factor</code> が使っている
+「姿勢を固定したターゲットとの <code>IntegratedVGICPFactorGPU</code>」は、ターゲットを地図点群にすれば
+そのまま地図マッチング因子になる構造です (ターゲットの姿勢 = 単位行列)。
+論文の実装がこの通りかは公開コードからは確認できませんが、理解の助けになるはずです。</p>
+</blockquote>
+<h3 id="34-vgicp-因子の中身">3.4 VGICP 因子の中身</h3>
+<p><code>gtsam_points</code> の</p>
+<ul>
+<li><code>include/gtsam_points/factors/integrated_matching_cost_factor.hpp</code>:
+  点群マッチング因子の共通の基底クラス。二項 (2 つの姿勢) と単項 (固定したターゲット姿勢) のコンストラクタがあり、
+  <code>update_correspondences()</code> (対応の更新) と <code>evaluate()</code> (誤差・<span class="arithmatex">\(\mathbf{H}\)</span>・<span class="arithmatex">\(\mathbf{b}\)</span> の計算) を派生クラスが実装する</li>
+<li><code>include/gtsam_points/factors/integrated_vgicp_factor.hpp</code>: CPU 版の VGICP 因子</li>
+<li><code>include/gtsam_points/factors/integrated_vgicp_factor_gpu.hpp</code>: <strong>GPU 版の VGICP 因子</strong> (論文で使用)</li>
+<li><code>include/gtsam_points/types/gaussian_voxelmap_cpu.hpp</code>, <code>gaussian_voxelmap_gpu.hpp</code>: ガウス分布ボクセル地図</li>
+<li><code>include/gtsam_points/types/point_cloud_cpu.hpp</code>, <code>point_cloud_gpu.hpp</code>: 点・共分散などを持つ点群型</li>
+</ul>
+<p>演習 4・7 の <code>toy2d.py</code> の <code>GaussianVoxelMap</code> と <code>vgicp_terms()</code> が、これらを 2D・numpy で書き直したものに相当します。</p>
+<h3 id="35-キーフレームの管理">3.5 キーフレームの管理</h3>
+<p><code>odometry_estimation_gpu.cpp</code> の <code>update_keyframes_overlap()</code> など。
+新しいフレームと既存キーフレームの <strong>重なり (overlap)</strong> を GPU で計算し、重なりが小さくなったら新しいキーフレームを追加、
+不要になったものを外す、という管理をしています (ICRA 2022 論文の方法)。</p>
+<h3 id="36-設定ファイル">3.6 設定ファイル</h3>
+<p><code>config/config_odometry_gpu.json</code> の主なパラメータ (<a href="https://koide3.github.io/glim/parameters.html">GLIM のパラメータ説明</a> も参照)</p>
+<table>
+<thead>
+<tr>
+<th>パラメータ</th>
+<th>設定ファイルの値</th>
+<th>意味</th>
+<th>教材の章</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>smoother_lag</td>
+<td>5.0</td>
+<td>固定ラグ平滑化のウィンドウ長 [s]</td>
+<td>06</td>
+</tr>
+<tr>
+<td>full_connection_window_size</td>
+<td>2</td>
+<td>直前の何フレームとマッチングするか</td>
+<td>06, 08</td>
+</tr>
+<tr>
+<td>voxel_resolution</td>
+<td>0.25</td>
+<td>VGICP の基本ボクセルサイズ [m]</td>
+<td>03</td>
+</tr>
+<tr>
+<td>voxelmap_levels</td>
+<td>2</td>
+<td>マルチ解像度の段数</td>
+<td>03</td>
+</tr>
+<tr>
+<td>max_num_keyframes</td>
+<td>15</td>
+<td>保持するキーフレーム数</td>
+<td>06</td>
+</tr>
+<tr>
+<td>keyframe_update_strategy</td>
+<td>OVERLAP</td>
+<td>キーフレームの選び方</td>
+<td>06</td>
+</tr>
+<tr>
+<td>isam2_relinearize_thresh</td>
+<td>0.1</td>
+<td>iSAM2 の再線形化の閾値</td>
+<td>05</td>
+</tr>
+</tbody>
+</table>
+<h2 id="4-コードを読む順番のおすすめ">4. コードを読む順番のおすすめ</h2>
+<ol>
+<li><strong>small_gicp の Python 版</strong> で、ICP/GICP/VGICP を実データ (自分の LiDAR の点群など) で試す
+   → <code>exercises/optional/opt_small_gicp_3d.py</code></li>
+<li><strong>GLIM を動かす</strong>: Docker イメージ (<code>koide3/glim_ros2</code>) と公式のデモデータで、オドメトリとマッピングを体験する
+   (<a href="https://koide3.github.io/glim/quickstart.html">Getting started</a>)</li>
+<li><strong>odometry_estimation_imu.cpp の insert_frame()</strong> を、この章の 3.1, 3.2 を見ながら読む</li>
+<li><strong>odometry_estimation_gpu.cpp の create_factors()</strong> を 3.3 を見ながら読む</li>
+<li><strong>gtsam_points の integrated_vgicp_factor</strong> を、<a href="03_point_cloud_registration.html">03 章</a> の式と見比べながら読む</li>
+<li>(挑戦) GLIM のオドメトリに「地図マッチング因子」を足すとしたら、どこに何を書けばよいか考えてみる</li>
+</ol>
+<blockquote>
+<p>ROS 2 と Gazebo を使っているなら、Gazebo で作った環境の点群を地図にして、シミュレーション上で
+地図の一部を消したときの振る舞いを試す、というのも良い発展課題です。</p>
+</blockquote>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="09_author_code_guide"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="08_paper_walkthrough.html"><small>前へ</small>08 論文精読ガイド</a><a class="next" href="10_glossary.html"><small>次へ</small>10 用語集</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>学習ロードマップ | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html" aria-current="page"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 00 章</span><span class="chip time">目安 15 分</span></div>
+<h1 id="00-学習ロードマップ">00. 学習ロードマップ</h1>
+<p>この教材は、次の論文を「自分の言葉で説明できる」ようになることを目標にしています。</p>
+<blockquote>
+<p><strong>点群・IMU 制約のウィンドウ最適化に基づく既知地図上での 6DoF 姿勢推定</strong>
+小出 健司, 大石 修士, 横塚 将志, 阪野 貴彦 (産業技術総合研究所)
+ロボティクス・メカトロニクス講演会 2023 (ROBOMECH2023)
+PDF: <a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf">https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf</a></p>
+</blockquote>
+<h2 id="論文をひとことで言うと">論文をひとことで言うと</h2>
+<p><strong>「LiDAR の点群と IMU を使い、既知の 3D 地図の上でロボットの位置と姿勢 (6 自由度) を推定する。
+その際、地図とのマッチングだけに頼らず、直前のフレーム同士のマッチングと IMU の情報も
+</strong>同じ最適化問題<strong>に入れて、最近の数秒分の状態をまとめて最適化する」</strong> という手法です。</p>
+<p>こうすることで、</p>
+<ul>
+<li>地図が一部欠けている・環境が地図作成時から変わっている場所でも、
+  フレーム同士のマッチングと IMU で推定を続けられる</li>
+<li>地図のある場所に戻れば、地図とのマッチングでドリフト (誤差の蓄積) が打ち消される</li>
+</ul>
+<p>という性質が得られます。従来手法 (NDT マッチング、UKF ベースの hdl_localization、
+パーティクルフィルタベースの mcl3d_ros) は地図とのマッチングへの依存が大きく、
+地図が欠けた領域に入ると推定が破綻した、と報告されています。</p>
+<p><img alt="論文の全体像" src="figures/fig_overview.svg" /></p>
+<h2 id="論文の目的関数">論文の目的関数</h2>
+<p>論文の中心は次のコスト関数です。これを最小にする状態 <span class="arithmatex">\(X\)</span> を求めます。</p>
+<div class="arithmatex">\[
+F(\mathcal{X}) = \sum_{\mathbf{x}_i \in \mathcal{X}} \sum_{j=i-2}^{i-1} f^{P}(\mathbf{x}_i, \mathbf{x}_j)
+ + \sum_{\mathbf{x}_i \in \mathcal{X}} f^{P}(\mathbf{x}_i, \mathcal{M})
+ + \sum_{\mathbf{x}_i \in \mathcal{X}} f^{I}(\mathbf{x}_{i-1}, \mathbf{x}_i)
+ + C(\mathcal{X})
+\]</div>
+<table>
+<thead>
+<tr>
+<th>記号</th>
+<th>意味</th>
+<th>詳しくは</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>X</td>
+<td>最適化ウィンドウ内の状態 (例: 最新 5 秒分)</td>
+<td><a href="06_fixed_lag_smoothing.html">06 章</a></td>
+</tr>
+<tr>
+<td>x_i</td>
+<td>時刻 i のセンサ状態 (姿勢・速度・IMU バイアス)</td>
+<td><a href="01_coordinates_and_rotation.html">01 章</a>, <a href="04_imu_and_preintegration.html">04 章</a></td>
+</tr>
+<tr>
+<td>f^P(x_i, x_j)</td>
+<td>フレーム i と j の点群マッチングのコスト (VGICP)</td>
+<td><a href="03_point_cloud_registration.html">03 章</a></td>
+</tr>
+<tr>
+<td>f^P(x_i, M)</td>
+<td>フレーム i と地図点群 M のマッチングのコスト</td>
+<td><a href="03_point_cloud_registration.html">03 章</a>, <a href="07_map_based_localization.html">07 章</a></td>
+</tr>
+<tr>
+<td>f^I(x_{i-1}, x_i)</td>
+<td>IMU 事前積分による運動の整合性のコスト</td>
+<td><a href="04_imu_and_preintegration.html">04 章</a></td>
+</tr>
+<tr>
+<td>C(X)</td>
+<td>ウィンドウから外れた過去の情報 (周辺化因子)</td>
+<td><a href="06_fixed_lag_smoothing.html">06 章</a></td>
+</tr>
+</tbody>
+</table>
+<p>この式の 1 項 1 項が「なぜそういう形なのか」「どうやって計算するのか」を理解するのが、この教材のゴールです。</p>
+<h2 id="必要な知識の地図">必要な知識の地図</h2>
+<p><img alt="知識の地図" src="figures/fig_knowledge_map.svg" /></p>
+<table>
+<thead>
+<tr>
+<th>章</th>
+<th>内容</th>
+<th>演習</th>
+<th>目安</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="01_coordinates_and_rotation.html">01 座標と回転</a></td>
+<td>回転行列、SO(3)/SE(3)、Lie 群、摂動によるヤコビアン</td>
+<td>ex01</td>
+<td>2〜3 時間</td>
+</tr>
+<tr>
+<td><a href="02_probability_and_least_squares.html">02 確率と最小二乗</a></td>
+<td>ガウス分布、マハラノビス距離、ガウス・ニュートン法</td>
+<td>ex02</td>
+<td>2 時間</td>
+</tr>
+<tr>
+<td><a href="03_point_cloud_registration.html">03 スキャンマッチング</a></td>
+<td>ICP、NDT、GICP、VGICP、GPU 化</td>
+<td>ex03, ex04</td>
+<td>3 時間</td>
+</tr>
+<tr>
+<td><a href="04_imu_and_preintegration.html">04 IMU と事前積分</a></td>
+<td>IMU の観測モデル、バイアス、ドリフト、事前積分</td>
+<td>ex05</td>
+<td>3 時間</td>
+</tr>
+<tr>
+<td><a href="05_factor_graph.html">05 ファクターグラフ</a></td>
+<td>因子・変数、スパース性、GTSAM、iSAM2</td>
+<td>ex06</td>
+<td>2 時間</td>
+</tr>
+<tr>
+<td><a href="06_fixed_lag_smoothing.html">06 固定ラグ平滑化と周辺化</a></td>
+<td>ウィンドウ最適化、シューア補行列、キーフレーム</td>
+<td>ex06, ex07</td>
+<td>2〜3 時間</td>
+</tr>
+<tr>
+<td><a href="07_map_based_localization.html">07 既知地図上の自己位置推定</a></td>
+<td>NDT・UKF・MCL と提案手法の違い</td>
+<td>ex07</td>
+<td>1〜2 時間</td>
+</tr>
+<tr>
+<td><a href="08_paper_walkthrough.html">08 論文精読ガイド</a></td>
+<td>論文を節ごとに読み解く。2D 再現実験</td>
+<td>ex07</td>
+<td>2 時間</td>
+</tr>
+<tr>
+<td><a href="09_author_code_guide.html">09 著者のコード案内</a></td>
+<td>GLIM, gtsam_points, small_gicp などのどこに何があるか</td>
+<td>optional</td>
+<td>適宜</td>
+</tr>
+<tr>
+<td><a href="10_glossary.html">10 用語集</a></td>
+<td>日本語・英語の対応表</td>
+<td>-</td>
+<td>-</td>
+</tr>
+</tbody>
+</table>
+<h2 id="おすすめの進め方">おすすめの進め方</h2>
+<ol>
+<li><strong>まず論文を 1 回ざっと読む。</strong> 分からない単語に印をつけるだけで OK です。</li>
+<li><strong>01 → 07 章を順に読み、各章の演習を実行する。</strong> 数式は「何を表しているか」を優先し、
+   導出は演習のコードで数値的に確かめるくらいで十分です。</li>
+<li><strong>08 章を見ながら論文をもう一度読む。</strong> 1 回目に印をつけた単語がすべて説明できるかチェックします。</li>
+<li><strong>余裕があれば 09 章を見ながら著者のコード (GLIM) を読む。</strong> 論文の式がコードのどこに対応するかを追うと、
+   理解が一段深まります。</li>
+</ol>
+<p>各章の最後にある「理解度チェック」で、説明できるか確認しながら進めてください。</p>
+<h2 id="学習を始める前の準備">学習を始める前の準備</h2>
+<p>リポジトリのトップの <a href="index.html">README</a> に従って Python 環境を作り、次を実行してください。</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/check_env.py
+</code></pre></div>
+<p>すべての演習は numpy / scipy / matplotlib だけで動きます。ROS や GPU は不要です。</p>
+<h2 id="理解度チェック-最終目標">理解度チェック (最終目標)</h2>
+<p>この教材を終えたとき、次の質問に答えられるようになっているはずです。</p>
+<ol>
+<li>なぜ地図マッチングだけでなく、前後フレームのマッチングもコスト関数に入れるのか?</li>
+<li>IMU 事前積分を使うと、何が効率的になるのか?</li>
+<li>VGICP が GPU と相性が良いのはなぜか?</li>
+<li>ウィンドウから外れた状態をただ捨てずに「周辺化」するのはなぜか?</li>
+<li>フィルタ (UKF・パーティクルフィルタ) とウィンドウ最適化の違いは何か?</li>
+<li>提案手法が苦手そうな状況はどんなときか?</li>
+</ol>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="00_roadmap"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="index.html"><small>前へ</small>はじめに</a><a class="next" href="01_coordinates_and_rotation.html"><small>次へ</small>01 座標と回転</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

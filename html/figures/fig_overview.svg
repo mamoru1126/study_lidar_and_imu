@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 360" width="900" height="360" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 14px; fill: #1f2733; }
+    .s { font-size: 12px; fill: #586273; }
+    .h { font-size: 15px; font-weight: 700; fill: #1f2733; }
+    .box { fill: #ffffff; stroke: #c8ced8; stroke-width: 1.2; }
+    .arrow { stroke: #586273; stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#586273"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="900" height="360" fill="#ffffff"/>
+
+  <text x="20" y="30" class="h">入力</text>
+  <text x="280" y="30" class="h">因子 (コスト関数の部品)</text>
+  <text x="652" y="30" class="h">推定</text>
+
+  <!-- inputs -->
+  <rect x="20" y="48" width="215" height="66" rx="8" class="box"/>
+  <rect x="20" y="48" width="6" height="66" fill="#2a78d6"/>
+  <text x="36" y="75" class="t">LiDAR / RGB-D 点群</text>
+  <text x="36" y="96" class="s">10 Hz 程度のフレーム</text>
+
+  <rect x="20" y="132" width="215" height="66" rx="8" class="box"/>
+  <rect x="20" y="132" width="6" height="66" fill="#1baf7a"/>
+  <text x="36" y="159" class="t">既知の 3D 地図点群 m</text>
+  <text x="36" y="180" class="s">事前に作成 (欠けていてもよい)</text>
+
+  <rect x="20" y="216" width="215" height="66" rx="8" class="box"/>
+  <rect x="20" y="216" width="6" height="66" fill="#eb6834"/>
+  <text x="36" y="243" class="t">IMU</text>
+  <text x="36" y="264" class="s">加速度・角速度 100〜1000 Hz</text>
+
+  <!-- factors -->
+  <rect x="280" y="44" width="330" height="62" rx="8" class="box"/>
+  <rect x="292" y="57" width="14" height="14" fill="#2a78d6"/>
+  <text x="315" y="69" class="t">スキャン間マッチング因子 f<tspan baseline-shift="super" font-size="10">P</tspan>(x<tspan baseline-shift="sub" font-size="10">i</tspan>, x<tspan baseline-shift="sub" font-size="10">j</tspan>)</text>
+  <text x="315" y="91" class="s">最新フレームと直前 2 フレームを VGICP で比較</text>
+
+  <rect x="280" y="120" width="330" height="62" rx="8" class="box"/>
+  <rect x="292" y="133" width="14" height="14" fill="#1baf7a"/>
+  <text x="315" y="145" class="t">地図マッチング因子 f<tspan baseline-shift="super" font-size="10">P</tspan>(x<tspan baseline-shift="sub" font-size="10">i</tspan>, m)</text>
+  <text x="315" y="167" class="s">フレームと地図点群を VGICP で比較</text>
+
+  <rect x="280" y="196" width="330" height="62" rx="8" class="box"/>
+  <rect x="292" y="209" width="14" height="14" fill="#eb6834"/>
+  <text x="315" y="221" class="t">IMU 因子 f<tspan baseline-shift="super" font-size="10">I</tspan>(x<tspan baseline-shift="sub" font-size="10">i-1</tspan>, x<tspan baseline-shift="sub" font-size="10">i</tspan>)</text>
+  <text x="315" y="243" class="s">IMU 事前積分で連続する状態をつなぐ</text>
+
+  <rect x="280" y="272" width="330" height="62" rx="8" class="box"/>
+  <rect x="292" y="285" width="14" height="14" fill="#8a93a3"/>
+  <text x="315" y="297" class="t">周辺化因子 C(X)</text>
+  <text x="315" y="319" class="s">ウィンドウから出た過去の情報のまとめ</text>
+
+  <!-- optimizer -->
+  <rect x="652" y="70" width="230" height="150" rx="10" fill="#eef3fb" stroke="#2a78d6" stroke-width="1.4"/>
+  <text x="668" y="100" class="t" font-weight="700">ウィンドウ最適化</text>
+  <text x="668" y="124" class="s">固定ラグ平滑化 (例: 5 秒分の状態)</text>
+  <text x="668" y="146" class="s">F(X) を最小化 (iSAM2 / GTSAM)</text>
+  <text x="668" y="168" class="s">VGICP の誤差計算は GPU で並列化</text>
+  <text x="668" y="190" class="s">古い状態は周辺化して C(X) へ</text>
+
+  <rect x="652" y="256" width="230" height="62" rx="8" class="box" stroke="#1f2733"/>
+  <text x="668" y="283" class="t" font-weight="700">出力: 6DoF の姿勢</text>
+  <text x="668" y="304" class="s">+ 速度・IMU バイアス</text>
+
+  <!-- arrows: inputs -> factors -->
+  <path d="M235,75 L277,75" class="arrow"/>
+  <path d="M235,92 C258,92 255,145 277,145" class="arrow"/>
+  <path d="M235,165 L277,158" class="arrow"/>
+  <path d="M235,249 L277,228" class="arrow"/>
+  <!-- factors -> optimizer -->
+  <path d="M610,75 C632,75 630,110 649,112" class="arrow"/>
+  <path d="M610,151 L649,140" class="arrow"/>
+  <path d="M610,227 C630,227 630,175 649,168" class="arrow"/>
+  <path d="M610,303 C640,303 635,205 649,198" class="arrow"/>
+  <!-- optimizer -> output -->
+  <path d="M767,220 L767,253" class="arrow"/>
+</svg>

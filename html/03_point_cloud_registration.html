@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>スキャンマッチング | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html" aria-current="page"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 03 章</span><span class="chip lidar">LiDAR</span><span class="chip time">目安 3 時間</span></div>
+<h1 id="03-スキャンマッチング-icp--ndt--gicp--vgicp">03. スキャンマッチング (ICP → NDT → GICP → VGICP)</h1>
+<h2 id="この章のゴール">この章のゴール</h2>
+<ul>
+<li>点群の前処理 (ダウンサンプリング、近傍探索、共分散推定) が分かる</li>
+<li>ICP・点対面 ICP・NDT・GICP・VGICP の違いを、図とコスト関数で説明できる</li>
+<li>VGICP が速く、GPU と相性が良い理由が分かる</li>
+<li>論文が「位置合わせの結果」ではなく「位置合わせのコストそのもの」を因子にしている意味が分かる</li>
+</ul>
+<blockquote>
+<p><strong>論文とのつながり</strong>
+論文の <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span> (フレーム同士) と <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathcal{M})\)</span> (フレームと地図) は、
+どちらも <strong>VGICP</strong> (Voxelized GICP) のコストです。著者自身が提案した手法で、GPU で高速に計算できます。</p>
+</blockquote>
+<hr />
+<h2 id="1-点群と前処理">1. 点群と前処理</h2>
+<p>LiDAR は周囲の物体までの距離を大量に測り、<strong>点群</strong> (3 次元の点の集まり) を出力します。
+論文の手法は特定のセンサに依存しない設計で、回転式 LiDAR だけでなく RGB-D カメラ (Azure Kinect など) にも
+適用できると述べられています。</p>
+<p>マッチングの前に、たいてい次の前処理をします。</p>
+<table>
+<thead>
+<tr>
+<th>処理</th>
+<th>目的</th>
+<th>典型的な方法</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ダウンサンプリング</td>
+<td>点を減らして高速化、密度を均一に</td>
+<td>ボクセルグリッド (各ボクセルの重心を残す)、ランダム間引き</td>
+</tr>
+<tr>
+<td>近傍探索</td>
+<td>各点の近くの点を見つける</td>
+<td>kd-tree、ボクセルハッシュ</td>
+</tr>
+<tr>
+<td>法線・共分散の推定</td>
+<td>点の周りの面の向き・形を知る</td>
+<td>近傍 k 点の共分散行列を固有値分解</td>
+</tr>
+<tr>
+<td>動きによる歪みの補正 (deskew)</td>
+<td>1 スキャン中にセンサが動いた影響を除く</td>
+<td>IMU で各点の時刻の姿勢を補間</td>
+</tr>
+</tbody>
+</table>
+<h2 id="2-位置合わせ-registration-の問題">2. 位置合わせ (registration) の問題</h2>
+<p>2 つの点群、<strong>ソース</strong> <span class="arithmatex">\(\mathcal{P} = \lbrace\mathbf{p}_k\rbrace\)</span> と <strong>ターゲット</strong> <span class="arithmatex">\(\mathcal{Q}\)</span> があり、
+ソースを動かしてターゲットに重ねる変換 <span class="arithmatex">\(\mathbf{T}\)</span> を求める問題です。
+ソースのどの点がターゲットのどの点に対応するかは分からないので、</p>
+<ol>
+<li>今の <span class="arithmatex">\(\mathbf{T}\)</span> で対応 (近い点どうし) を決める</li>
+<li>対応が正しいとして <span class="arithmatex">\(\mathbf{T}\)</span> を最適化する</li>
+</ol>
+<p>を繰り返します。違いは「何と何の距離を測るか」です。</p>
+<p><img alt="位置合わせの種類" src="figures/fig_registration_types.svg" /></p>
+<h2 id="3-点対点-icp">3. 点対点 ICP</h2>
+<p>最も素朴な方法で、最近傍の点との距離の 2 乗和を最小化します。</p>
+<div class="arithmatex">\[
+E(\mathbf{T}) = \sum_k \lVert \mathbf{q}_k - \mathbf{T}\mathbf{p}_k \rVert^2
+\]</div>
+<p>対応が決まっていれば、重心を合わせて SVD を使うと閉じた形で解けます (演習 3 の <code>icp_point_to_point</code>)。
+ただし、LiDAR の点は物体の表面を「まばらにサンプリング」したものなので、2 つのスキャンで同じ場所の点が
+取れているとは限りません。そのため、壁に沿う方向に余計な力がかかり、<strong>収束が遅く、結果が偏り</strong>やすくなります。</p>
+<h2 id="4-点対面-icp">4. 点対面 ICP</h2>
+<p>最近傍点の「面」(法線 <span class="arithmatex">\(\mathbf{n}_k\)</span> を持つ平面) までの距離を使います。</p>
+<div class="arithmatex">\[
+E(\mathbf{T}) = \sum_k \left(\mathbf{n}_k^\top(\mathbf{q}_k - \mathbf{T}\mathbf{p}_k)\right)^2
+\]</div>
+<p>面に沿う方向のずれは誤差にならないので、サンプリング位置の違いに強く、収束がずっと速くなります。</p>
+<h2 id="5-ndt-normal-distributions-transform">5. NDT (Normal Distributions Transform)</h2>
+<p>ターゲットを <strong>ボクセル (立方体のマス)</strong> に分け、各ボクセル内の点の分布を正規分布 (平均・共分散) で表します。
+ソースの各点が、入ったボクセルの分布の中でどれくらい「もっともらしいか」を最大化します。</p>
+<ul>
+<li>長所: 対応点探索が不要 (ボクセルを引くだけ)。地図との照合に広く使われている (Autoware など)</li>
+<li>短所: 1 つのボクセルに十分な点がないと分布が作れない。ボクセルサイズに敏感</li>
+</ul>
+<p>論文の比較手法の 1 つ「NDT スキャンマッチング」はこれです。</p>
+<h2 id="6-gicp-generalized-icp">6. GICP (Generalized ICP)</h2>
+<p>GICP [Segal+ RSS2009] は <strong>ソースの点もターゲットの点も正規分布</strong> とみなします。
+点 <span class="arithmatex">\(\mathbf{p}_k\)</span> の周りの面の形を共分散 <span class="arithmatex">\(\mathbf{C}_k\)</span> で表し、対応点 <span class="arithmatex">\(\mathbf{q}_k\)</span> の共分散を <span class="arithmatex">\(\mathbf{C}'_k\)</span> とすると、</p>
+<div class="arithmatex">\[
+\mathbf{d}_k = \mathbf{q}_k - \mathbf{T}\mathbf{p}_k,
+\qquad
+E(\mathbf{T}) = \sum_k \mathbf{d}_k^\top \left(\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\right)^{-1} \mathbf{d}_k
+\]</div>
+<p>を最小化します。2 つの正規分布の差もまた正規分布で、その共分散が <span class="arithmatex">\(\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\)</span> になる、
+というのが式の意味です (<a href="02_probability_and_least_squares.html">02 章</a> のマハラノビス距離)。</p>
+<p><strong>共分散の正則化</strong>: GICP では、近傍点から求めた共分散の固有値を <span class="arithmatex">\((1, 1, \varepsilon)\)</span> (<span class="arithmatex">\(\varepsilon \approx 10^{-3}\)</span>) に置き換え、
+「面に沿う 2 方向は大きく、法線方向だけ小さい」形にそろえます。こうすると、</p>
+<ul>
+<li>面に沿う方向のずれはほとんど誤差にならない (点対面 ICP と同じ効果)</li>
+<li>両方の点群の面の向きを考える「面対面」のマッチングになる</li>
+</ul>
+<p>という性質が得られ、精度と頑健さが向上します。共分散の正則化の値を変えると、ICP (等方的な分布) や
+点対面 ICP に近づけることもできます。</p>
+<p><img alt="ICP の比較" src="figures/ex03_icp_2d.png" /></p>
+<p>演習 3 では、点対点 ICP が 60 回反復しても数 cm の偏りが残るのに対し、点対線 ICP と GICP は 2〜3 回で
+ほぼ収束することが分かります。</p>
+<div data-demo="icp"></div>
+
+<h2 id="7-vgicp-voxelized-gicp">7. VGICP (Voxelized GICP)</h2>
+<p>GICP は各点について kd-tree で最近傍を探す必要があり、点が多いと重くなります。
+VGICP [Koide+ ICRA2021] は、NDT のようにターゲットをボクセルに分けますが、
+<strong>各ボクセルの分布を「中の点の分布 (GICP の共分散) を平均したもの」</strong> として作ります。</p>
+<div class="arithmatex">\[
+\boldsymbol{\mu}^{\text{voxel}} = \frac{1}{N}\sum_{\mathbf{q} \in \text{voxel}} \mathbf{q},
+\qquad
+\mathbf{C}^{\text{voxel}} = \frac{1}{N}\sum_{\mathbf{q} \in \text{voxel}} \mathbf{C}_{\mathbf{q}}
+\]</div>
+<p>ソースの点 <span class="arithmatex">\(\mathbf{p}_k\)</span> は、変換後に入ったボクセルの分布と比べるだけです。</p>
+<div class="arithmatex">\[
+E(\mathbf{T}) = \sum_k \mathbf{d}_k^\top \left(\mathbf{C}^{\text{voxel}}_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\right)^{-1}\mathbf{d}_k,
+\qquad \mathbf{d}_k = \boldsymbol{\mu}^{\text{voxel}}_k - \mathbf{T}\mathbf{p}_k
+\]</div>
+<p>ポイントは次の 3 つです。</p>
+<ol>
+<li><strong>対応探索がハッシュ表の参照 1 回で済む</strong>: kd-tree の探索が要らない</li>
+<li><strong>点の少ないボクセルでも使える</strong>: NDT はボクセル内の点から共分散を計算するので点が少ないと不安定だが、
+   VGICP は「点ごとの共分散 (近傍から計算済み)」を平均するので 1 点でも分布になる</li>
+<li><strong>GPU 向き</strong>: 全点で同じ計算 (参照 → 行列計算) をするだけで、条件分岐やデータ依存の探索がない。
+   数万点を並列に処理できる</li>
+</ol>
+<h3 id="マルチ解像度ボクセル">マルチ解像度ボクセル</h3>
+<p>VGICP は「点が入ったボクセル 1 つ」としか比べないので、初期値が大きくずれていると正しいボクセルに入らず、
+<strong>収束域 (うまく合う初期値の範囲) が狭く</strong>なります。そこで、細かいボクセルと粗いボクセルを併用します。
+GLIM の設定 <code>voxelmap_levels</code> (例: 2 段) がこれです。演習 4 で、粗いボクセルを足すと収束域が広がることを確認できます。</p>
+<p><img alt="VGICP とマルチ解像度" src="figures/ex04_vgicp_2d.png" /></p>
+<h2 id="8-位置合わせの結果ではなくコストを因子にする">8. 位置合わせの「結果」ではなく「コスト」を因子にする</h2>
+<p>ここが論文 (と著者の一連の研究) を理解するうえで重要な点です。</p>
+<p><strong>よくある方法 (疎結合・ポーズグラフ)</strong>:
+ICP などで 2 フレーム間の相対姿勢を求め、その結果 (と、だいたいの共分散) を「相対姿勢の観測」として
+グラフに入れます。</p>
+<p><strong>論文の方法 (マッチングコスト因子)</strong>:
+VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j)\)</span> そのものを因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span> としてグラフに入れます。
+最適化のたびに、今の推定値で対応を取り直して線形化します (GLIM の <code>IntegratedVGICPFactorGPU</code>)。</p>
+<p>この違いには次の意味があります。</p>
+<ul>
+<li>位置合わせの結果を 1 つの正規分布で要約するときの <strong>情報の欠落がない</strong></li>
+<li>廊下のような退化した環境でも、「決まる方向」の情報だけが自然にグラフに入り、
+  決まらない方向は IMU など他の因子が補う</li>
+<li>1 つのフレームを複数のフレーム・地図と <strong>同時に</strong> 合わせられる</li>
+</ul>
+<p>GLIM の論文では、因子 1 つあたりの線形化結果 (<span class="arithmatex">\(\mathbf{H}\)</span> と <span class="arithmatex">\(\mathbf{b}\)</span> のブロック) を、全点の和として GPU で計算しています。</p>
+<div class="arithmatex">\[
+\mathbf{H}_{ii} = \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{A}_k, \quad
+\mathbf{H}_{ij} = \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k, \quad
+\mathbf{H}_{jj} = \sum_k \mathbf{B}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k
+\]</div>
+<p>(<span class="arithmatex">\(\mathbf{A}_k\)</span>, <span class="arithmatex">\(\mathbf{B}_k\)</span> は 2 つの姿勢に対する誤差のヤコビアン。転置の位置は論文によって書き方が異なります)
+演習 7 の <code>ScanFactor.linearize</code> が、これを numpy で書いたものです。</p>
+<h2 id="9-gpu-のちょっとした話">9. GPU のちょっとした話</h2>
+<p>GLIM の論文によれば、多数の VGICP 因子を線形化するとき、</p>
+<ul>
+<li>線形化点 (各姿勢の推定値) をまとめて 1 回で GPU に送り、</li>
+<li>因子ごとの計算は複数のストリームで並列に行い、</li>
+<li>結果もまとめて 1 回で CPU に戻す</li>
+</ul>
+<p>ことで、因子の数によらず CPU⇔GPU の転送を 2 回に抑えています。
+「計算そのもの」より「転送や同期」がボトルネックになりやすいのが GPU プログラミングの勘所です。</p>
+<h2 id="演習-3-4">演習 3, 4</h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex03_icp_2d.py<span class="w">      </span><span class="c1"># 点対点 ICP, 点対線 ICP, GICP の比較</span>
+python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">    </span><span class="c1"># ボクセル地図, 対応探索の速さ, マルチ解像度</span>
+</code></pre></div>
+<h2 id="理解度チェック">理解度チェック</h2>
+<ol>
+<li>点対点 ICP が LiDAR 点群で偏りやすいのはなぜ?</li>
+<li>GICP の <span class="arithmatex">\((\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top)^{-1}\)</span> は何を表している?</li>
+<li>NDT と VGICP は、どちらもボクセルごとに正規分布を持つ。違いは何?</li>
+<li>VGICP が GPU で速いのはなぜ?</li>
+<li>「位置合わせの結果を因子にする」のと「位置合わせのコストを因子にする」のでは何が違う?</li>
+</ol>
+<details>
+<summary>答えの例</summary>
+<ol>
+<li>2 つのスキャンで表面上の同じ位置の点が取れているとは限らず、最近傍の点が少しずれた場所にあるため、面に沿う方向に余計な誤差が生じる。</li>
+<li>ソースの点の分布とターゲットの点の分布の差 (これも正規分布) の共分散の逆、つまり情報行列。面の法線方向の誤差を重く、面に沿う方向を軽く数える。</li>
+<li>NDT はボクセル内の点の座標から共分散を作るので点が少ないと不安定。VGICP は点ごとに近傍から求めた共分散を平均するので、点が少なくても分布が作れる。また VGICP はソース側の点の共分散も使う (分布対分布)。</li>
+<li>対応探索がボクセルの参照 1 回で済み、全点で同じ計算をするだけなので、分岐が少なく大量に並列化できる。</li>
+<li>結果を因子にすると、相対姿勢の正規分布という要約で情報が失われる。コストを因子にすると、点ごとの誤差を最適化のたびに線形化し直すので、退化方向の扱いや複数フレームとの同時マッチングが自然にできる。</li>
+</ol>
+</details>
+<h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
+<ul>
+<li>A. Segal, D. Haehnel, S. Thrun, "Generalized-ICP," RSS 2009.</li>
+<li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Voxelized GICP for Fast and Accurate 3D Point Cloud Registration," ICRA 2021.</li>
+<li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Globally Consistent 3D LiDAR Mapping with GPU-accelerated GICP Matching Cost Factors," IEEE RA-L, 2021.</li>
+<li>著者の実装: <a href="https://github.com/koide3/fast_gicp">fast_gicp</a>, <a href="https://github.com/koide3/small_gicp">small_gicp</a>, <a href="https://github.com/koide3/gtsam_points">gtsam_points</a></li>
+</ul>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="03_point_cloud_registration"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="02_probability_and_least_squares.html"><small>前へ</small>02 確率と最小二乗</a><a class="next" href="04_imu_and_preintegration.html"><small>次へ</small>04 IMU と事前積分</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

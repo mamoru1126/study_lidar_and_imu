@@ -1,0 +1,56 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 400" width="760" height="400" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 14px; fill: #1f2733; font-weight: 700; }
+    .s { font-size: 12px; fill: #586273; }
+    .lbl { font-size: 14px; fill: #1f2733; font-style: italic; }
+    .edge { stroke: #9aa3b0; stroke-width: 1.5; fill: none; }
+    .st { fill: #ffffff; stroke: #1f2733; stroke-width: 1.6; }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#586273"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="760" height="400" fill="#ffffff"/>
+
+  <!-- row 1 -->
+  <text x="20" y="34" class="t">① 時刻 t : ウィンドウには x₁〜x₅</text>
+  <rect x="70" y="50" width="520" height="100" rx="12" fill="#f4f7fc" stroke="#2a78d6" stroke-dasharray="6 5"/>
+  <path d="M136,100 L194,100 M246,100 L304,100 M356,100 L414,100 M466,100 L524,100" class="edge"/>
+  <path d="M120,80 Q220,40 320,80 M230,80 Q330,40 430,80 M340,80 Q440,40 540,80" class="edge"/>
+  <g fill="#eb6834"><rect x="159" y="94" width="12" height="12"/><rect x="269" y="94" width="12" height="12"/><rect x="379" y="94" width="12" height="12"/><rect x="489" y="94" width="12" height="12"/></g>
+  <g fill="#2a78d6"><rect x="214" y="54" width="12" height="12"/><rect x="324" y="54" width="12" height="12"/><rect x="434" y="54" width="12" height="12"/></g>
+  <g fill="#1baf7a"><rect x="104" y="128" width="12" height="12"/><rect x="214" y="128" width="12" height="12"/><rect x="324" y="128" width="12" height="12"/><rect x="434" y="128" width="12" height="12"/><rect x="544" y="128" width="12" height="12"/></g>
+  <circle cx="110" cy="100" r="24" class="st" stroke="#eb6834" stroke-width="2.4"/>
+  <circle cx="220" cy="100" r="24" class="st"/><circle cx="330" cy="100" r="24" class="st"/>
+  <circle cx="440" cy="100" r="24" class="st"/><circle cx="550" cy="100" r="24" class="st"/>
+  <text x="110" y="105" class="lbl" text-anchor="middle">x₁</text><text x="220" y="105" class="lbl" text-anchor="middle">x₂</text>
+  <text x="330" y="105" class="lbl" text-anchor="middle">x₃</text><text x="440" y="105" class="lbl" text-anchor="middle">x₄</text>
+  <text x="550" y="105" class="lbl" text-anchor="middle">x₅</text>
+  <text x="610" y="96" class="s">新しいフレーム x₆ が</text>
+  <text x="610" y="114" class="s">来た → x₁ を消したい</text>
+
+  <path d="M110,160 L110,196" stroke="#586273" stroke-width="1.6" marker-end="url(#ah)"/>
+  <text x="124" y="184" class="s">x₁ に繋がる因子 (IMU・スキャン・地図) だけ集めて 2 次近似し、x₁ を消去</text>
+
+  <!-- row 2 -->
+  <text x="20" y="230" class="t">② 時刻 t+1 : x₁ を周辺化して、ウィンドウは x₂〜x₆</text>
+  <circle cx="110" cy="290" r="24" fill="#ffffff" stroke="#c3c8d1" stroke-dasharray="4 3" stroke-width="1.5"/>
+  <text x="110" y="295" class="lbl" text-anchor="middle" fill="#9aa3b0">x₁</text>
+  <rect x="180" y="240" width="520" height="100" rx="12" fill="#f4f7fc" stroke="#2a78d6" stroke-dasharray="6 5"/>
+  <path d="M246,290 L304,290 M356,290 L414,290 M466,290 L524,290 M576,290 L634,290" class="edge"/>
+  <path d="M230,270 Q330,230 430,270 M340,270 Q440,230 540,270 M450,270 Q550,230 650,270" class="edge"/>
+  <path d="M232,312 Q275,350 318,312" class="edge" stroke="#8a93a3" stroke-width="2"/>
+  <g fill="#eb6834"><rect x="269" y="284" width="12" height="12"/><rect x="379" y="284" width="12" height="12"/><rect x="489" y="284" width="12" height="12"/><rect x="599" y="284" width="12" height="12"/></g>
+  <g fill="#2a78d6"><rect x="324" y="244" width="12" height="12"/><rect x="434" y="244" width="12" height="12"/><rect x="544" y="244" width="12" height="12"/></g>
+  <rect x="268" y="325" width="14" height="14" fill="#8a93a3"/>
+  <circle cx="220" cy="290" r="24" class="st"/><circle cx="330" cy="290" r="24" class="st"/>
+  <circle cx="440" cy="290" r="24" class="st"/><circle cx="550" cy="290" r="24" class="st"/>
+  <circle cx="660" cy="290" r="24" class="st" stroke="#2a78d6" stroke-width="2.4"/>
+  <text x="220" y="295" class="lbl" text-anchor="middle">x₂</text><text x="330" y="295" class="lbl" text-anchor="middle">x₃</text>
+  <text x="440" y="295" class="lbl" text-anchor="middle">x₄</text><text x="550" y="295" class="lbl" text-anchor="middle">x₅</text>
+  <text x="660" y="295" class="lbl" text-anchor="middle">x₆</text>
+
+  <text x="20" y="372" class="s">灰色の因子 C(X) = 「x₁ が持っていた情報」を x₂, x₃ への事前分布として残したもの。</text>
+  <text x="20" y="390" class="s">計算はシューア補行列 H' = H<tspan baseline-shift="sub" font-size="9">rr</tspan> − H<tspan baseline-shift="sub" font-size="9">r1</tspan> H<tspan baseline-shift="sub" font-size="9">11</tspan>⁻¹ H<tspan baseline-shift="sub" font-size="9">1r</tspan>  (地図因子は図を見やすくするため②では省略)</text>
+</svg>

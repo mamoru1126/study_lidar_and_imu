@@ -1,0 +1,11 @@
+# 演習 (必須)
+numpy>=1.24
+scipy>=1.10
+matplotlib>=3.7
+
+# HTML 版を docs/ から再生成する場合
+markdown>=3.5
+pymdown-extensions>=10.0
+
+# 発展演習 (exercises/optional) を試す場合は追加で:
+#   pip install small_gicp gtsam

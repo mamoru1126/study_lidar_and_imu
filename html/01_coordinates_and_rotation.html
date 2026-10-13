@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>座標と回転 | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html" aria-current="page"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 01 章</span><span class="chip math">数学</span><span class="chip time">目安 2〜3 時間</span></div>
+<h1 id="01-座標と回転-so3-se3-lie-群">01. 座標と回転 (SO(3), SE(3), Lie 群)</h1>
+<h2 id="この章のゴール">この章のゴール</h2>
+<ul>
+<li>センサの「姿勢 (pose)」を回転行列と並進ベクトルで表し、点の座標変換ができる</li>
+<li>相対姿勢 <span class="arithmatex">\(\mathbf{T}_i^{-1}\mathbf{T}_j\)</span> の意味が分かる</li>
+<li>回転は普通のベクトルのように足し算できないこと、そのために Lie 群の道具 (Exp / Log) を使うことが分かる</li>
+<li>「微小回転を掛ける」ことでヤコビアンを求める方法 (摂動) が分かる</li>
+</ul>
+<blockquote>
+<p><strong>論文とのつながり</strong>
+論文の状態 <span class="arithmatex">\(\mathbf{x}_i\)</span> には 6 自由度の姿勢が含まれます。スキャンマッチング因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span> は
+「フレーム j の点群を、相対姿勢でフレーム i の座標に移して比べる」ものですし、
+最適化 (ガウス・ニュートン法) では姿勢に「微小な更新量」を足していく必要があります。
+この章の内容はすべての因子の土台です。</p>
+</blockquote>
+<hr />
+<h2 id="1-姿勢--位置--向き">1. 姿勢 = 位置 + 向き</h2>
+<p>3 次元空間の剛体の姿勢は、<strong>位置 3 自由度 + 向き 3 自由度 = 6 自由度 (6DoF)</strong> で表せます。
+論文タイトルの「6DoF 姿勢推定」はこれのことです。</p>
+<ul>
+<li>位置: 並進ベクトル <span class="arithmatex">\(\mathbf{t} \in \mathbb{R}^3\)</span></li>
+<li>向き: 回転行列 <span class="arithmatex">\(\mathbf{R} \in SO(3)\)</span></li>
+</ul>
+<p>回転行列は <span class="arithmatex">\(3 \times 3\)</span> の行列ですが、次の条件を満たすものだけが「回転」です。</p>
+<div class="arithmatex">\[
+\mathbf{R}^\top \mathbf{R} = \mathbf{I}, \qquad \det(\mathbf{R}) = 1
+\]</div>
+<p>この条件を満たす行列全体を <strong>SO(3)</strong> (3 次元の特殊直交群) と呼びます。
+9 個の数字を持っていますが、条件のせいで自由に動かせるのは 3 自由度だけです。</p>
+<h2 id="2-座標変換と同次変換行列">2. 座標変換と同次変換行列</h2>
+<p>センサ (LiDAR) が観測した点 <span class="arithmatex">\(\mathbf{p}\)</span> はセンサの座標系で表されています。
+センサの姿勢が <span class="arithmatex">\((\mathbf{R}, \mathbf{t})\)</span> のとき、その点の世界座標は</p>
+<div class="arithmatex">\[
+\mathbf{p}^{\text{world}} = \mathbf{R}\,\mathbf{p}^{\text{sensor}} + \mathbf{t}
+\]</div>
+<p>です。これを 4×4 の <strong>同次変換行列</strong> でまとめると、掛け算 1 回で書けて便利です。</p>
+<div class="arithmatex">\[
+\mathbf{T} = \begin{bmatrix} \mathbf{R} & \mathbf{t} \\ \mathbf{0}^\top & 1 \end{bmatrix} \in SE(3),
+\qquad
+\begin{bmatrix} \mathbf{p}^{\text{world}} \\ 1 \end{bmatrix} = \mathbf{T} \begin{bmatrix} \mathbf{p}^{\text{sensor}} \\ 1 \end{bmatrix}
+\]</div>
+<p>このような行列全体を <strong>SE(3)</strong> (3 次元の特殊ユークリッド群) と呼びます。</p>
+<h3 id="合成と逆変換">合成と逆変換</h3>
+<ul>
+<li>合成: 変換を続けて行うのは行列の掛け算 <span class="arithmatex">\(\mathbf{T}_a \mathbf{T}_b\)</span></li>
+<li>逆変換: 回転行列の逆は転置で済むので、次のように簡単に計算できる</li>
+</ul>
+<div class="arithmatex">\[
+\mathbf{T}^{-1} = \begin{bmatrix} \mathbf{R}^\top & -\mathbf{R}^\top \mathbf{t} \\ \mathbf{0}^\top & 1 \end{bmatrix}
+\]</div>
+<h3 id="名前の付け方のコツ-t_world_sensor">名前の付け方のコツ: <code>T_world_sensor</code></h3>
+<p>著者のコード (GLIM など) では <code>T_world_imu</code> のような変数名がよく出てきます。
+これは「imu 座標系の点を world 座標系に移す変換」という意味です。
+添字を「左 ← 右」と読むと、合成が正しいかを目で確認できます。</p>
+<div class="arithmatex">\[
+\mathbf{T}_{\text{world}\leftarrow\text{lidar}} = \mathbf{T}_{\text{world}\leftarrow\text{imu}}\;\mathbf{T}_{\text{imu}\leftarrow\text{lidar}}
+\]</div>
+<p>(内側の添字 imu が打ち消し合っている)</p>
+<h3 id="相対姿勢">相対姿勢</h3>
+<p>世界座標での姿勢 <span class="arithmatex">\(\mathbf{T}_i, \mathbf{T}_j\)</span> から、<strong>フレーム j の座標をフレーム i の座標に移す変換</strong> は</p>
+<div class="arithmatex">\[
+\mathbf{T}_{ij} = \mathbf{T}_i^{-1}\,\mathbf{T}_j
+\]</div>
+<p>です。論文のスキャン間マッチング因子は、まさにこの <span class="arithmatex">\(\mathbf{T}_{ij}\)</span> でフレーム j の点をフレーム i に移して
+比べています (<a href="03_point_cloud_registration.html">03 章</a>)。</p>
+<h2 id="3-回転の表し方いろいろ">3. 回転の表し方いろいろ</h2>
+<table>
+<thead>
+<tr>
+<th>表現</th>
+<th>数字の個数</th>
+<th>長所</th>
+<th>短所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>回転行列</td>
+<td>9</td>
+<td>合成・点の変換が掛け算で簡単</td>
+<td>冗長。誤差が溜まると直交性が崩れる</td>
+</tr>
+<tr>
+<td>オイラー角 (roll, pitch, yaw)</td>
+<td>3</td>
+<td>人間に分かりやすい</td>
+<td>ジンバルロック (特異点) がある。合成が面倒</td>
+</tr>
+<tr>
+<td>四元数 (クォータニオン)</td>
+<td>4</td>
+<td>コンパクトで特異点なし。数値的に安定</td>
+<td>直感的でない。q と -q が同じ回転</td>
+</tr>
+<tr>
+<td>回転ベクトル (軸 × 角度)</td>
+<td>3</td>
+<td>最小の 3 個。微小回転の表現に最適</td>
+<td>合成は直接できない (Exp/Log を経由)</td>
+</tr>
+</tbody>
+</table>
+<p>最適化では「<strong>姿勢そのものは回転行列 (や四元数) で持ち、更新量は回転ベクトルで表す</strong>」のが定番です。
+GTSAM もこの方式です。</p>
+<h2 id="4-回転は足し算できない--lie-群の考え方">4. 回転は足し算できない → Lie 群の考え方</h2>
+<p>ガウス・ニュートン法では「今の推定値 + 更新量」を繰り返します。
+しかし回転行列に普通に行列を足すと、<span class="arithmatex">\(\mathbf{R}^\top\mathbf{R} = \mathbf{I}\)</span> が崩れて回転行列でなくなってしまいます。</p>
+<p>そこで、</p>
+<ol>
+<li>更新量は 3 次元の <strong>回転ベクトル</strong> <span class="arithmatex">\(\boldsymbol{\delta} \in \mathbb{R}^3\)</span> で表す (これは自由に足し引きできる)</li>
+<li>それを <strong>指数写像 Exp</strong> で回転行列に直す</li>
+<li>掛け算で今の回転に合成する</li>
+</ol>
+<p>という手順を踏みます。</p>
+<div class="arithmatex">\[
+\mathbf{R} \leftarrow \mathbf{R}\,\operatorname{Exp}(\boldsymbol{\delta})
+\]</div>
+<h3 id="hat-演算子と指数写像">hat 演算子と指数写像</h3>
+<p>回転ベクトル <span class="arithmatex">\(\boldsymbol{\omega} = (\omega_x, \omega_y, \omega_z)\)</span> から作る歪対称行列を <span class="arithmatex">\([\boldsymbol{\omega}]_\times\)</span> と書きます (hat 演算子)。</p>
+<div class="arithmatex">\[
+[\boldsymbol{\omega}]_\times = \begin{bmatrix} 0 & -\omega_z & \omega_y \\ \omega_z & 0 & -\omega_x \\ -\omega_y & \omega_x & 0 \end{bmatrix},
+\qquad [\boldsymbol{\omega}]_\times \mathbf{p} = \boldsymbol{\omega} \times \mathbf{p}
+\]</div>
+<p>指数写像は、回転角 <span class="arithmatex">\(\theta = \lVert\boldsymbol{\omega}\rVert\)</span>、回転軸 <span class="arithmatex">\(\mathbf{a} = \boldsymbol{\omega}/\theta\)</span> として
+<strong>ロドリゲスの公式</strong> で計算できます。</p>
+<div class="arithmatex">\[
+\operatorname{Exp}(\boldsymbol{\omega}) = \mathbf{I} + \sin\theta\,[\mathbf{a}]_\times + (1 - \cos\theta)\,[\mathbf{a}]_\times^2
+\]</div>
+<p>逆向きの <strong>対数写像 Log</strong> は回転行列から回転ベクトルを取り出します。</p>
+<p>イメージとしては、SO(3) は「曲がった空間 (多様体)」で、その 1 点に接する平らな空間 (接空間, 3 次元) の上で
+計算してから Exp で曲がった空間に戻している、という感じです。</p>
+<h3 id="微小回転の近似">微小回転の近似</h3>
+<p><span class="arithmatex">\(\boldsymbol{\delta}\)</span> が小さいときは</p>
+<div class="arithmatex">\[
+\operatorname{Exp}(\boldsymbol{\delta}) \approx \mathbf{I} + [\boldsymbol{\delta}]_\times
+\]</div>
+<p>と近似できます。演習 1 の図で、この近似の誤差が角度の 2 乗で小さくなることを確かめられます。</p>
+<p><img alt="1 次近似の精度" src="figures/ex01_exp_approx.png" /></p>
+<h2 id="5-摂動-perturbation-でヤコビアンを求める">5. 摂動 (perturbation) でヤコビアンを求める</h2>
+<p>最適化には「状態を少し動かしたとき、誤差がどれだけ変わるか (ヤコビアン)」が必要です。
+回転を少し動かすことを「<span class="arithmatex">\(\mathbf{R}\)</span> に右から <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> を掛ける」と定義すると、
+計算がとても簡単になります。</p>
+<p>例として、点を回転させる関数 <span class="arithmatex">\(f(\mathbf{R}) = \mathbf{R}\mathbf{p}\)</span> を考えます。</p>
+<div class="arithmatex">\[
+\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{p}
+\approx \mathbf{R}(\mathbf{I} + [\boldsymbol{\delta}]_\times)\mathbf{p}
+= \mathbf{R}\mathbf{p} + \mathbf{R}(\boldsymbol{\delta}\times\mathbf{p})
+= \mathbf{R}\mathbf{p} - \mathbf{R}[\mathbf{p}]_\times\boldsymbol{\delta}
+\]</div>
+<p>したがって</p>
+<div class="arithmatex">\[
+\frac{\partial (\mathbf{R}\mathbf{p})}{\partial \boldsymbol{\delta}} = -\mathbf{R}\,[\mathbf{p}]_\times
+\]</div>
+<p>です。最後の変形では外積の性質 <span class="arithmatex">\(\boldsymbol{\delta}\times\mathbf{p} = -\mathbf{p}\times\boldsymbol{\delta}\)</span> を使いました。</p>
+<p>GLIM の論文 (RAS 2024) に出てくる VGICP 因子のヤコビアン
+<span class="arithmatex">\(\mathbf{A}_k = [\,\mathbf{R}_{ij}[\boldsymbol{\mu}_k]_\times,\ -\mathbf{R}_{ij}\,]\)</span> なども、この計算の応用です
+(符号は誤差の定義の向きで変わります)。</p>
+<blockquote>
+<p><strong>右摂動と左摂動</strong>
+<span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> (右から掛ける) と <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\mathbf{R}\)</span> (左から掛ける) の 2 流派があります。
+右はセンサ座標系で、左は世界座標系で微小回転を考えることに相当します。GTSAM は右摂動です。
+論文やコードを読むときは、どちらを使っているかを最初に確認しましょう。</p>
+</blockquote>
+<h2 id="6-se3-の場合">6. SE(3) の場合</h2>
+<p>姿勢全体 <span class="arithmatex">\(\mathbf{T}\)</span> も同じように、6 次元の更新量 <span class="arithmatex">\(\boldsymbol{\xi} = (\boldsymbol{\delta}_\text{rot}, \boldsymbol{\delta}_\text{trans})\)</span> を使って
+<span class="arithmatex">\(\mathbf{T} \leftarrow \mathbf{T}\operatorname{Exp}(\boldsymbol{\xi})\)</span> と更新します。
+GTSAM の <code>Pose3</code> は回転 3 成分 → 並進 3 成分の順に並べます (ライブラリによって順番が違うので注意)。</p>
+<h2 id="7-演習で使う-2d-版-se2">7. 演習で使う 2D 版: SE(2)</h2>
+<p>演習では計算を簡単にするため、2D の姿勢 <span class="arithmatex">\((x, y, \theta)\)</span> を使います。</p>
+<div class="arithmatex">\[
+\mathbf{R}(\theta) = \begin{bmatrix} \cos\theta & -\sin\theta \\ \sin\theta & \cos\theta \end{bmatrix},
+\qquad \mathbf{p}^{\text{world}} = \mathbf{R}(\theta)\mathbf{p} + \begin{bmatrix} x \\ y \end{bmatrix}
+\]</div>
+<p>2D の回転は角度 1 個で表せて、角度は (範囲を <span class="arithmatex">\([-\pi, \pi)\)</span> に丸めれば) 足し算できます。
+3D の考え方を 2D で練習してから 3D に戻ると理解しやすくなります。</p>
+<h2 id="演習-1">演習 1</h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex01_rotation.py
+</code></pre></div>
+<ul>
+<li>回転行列の性質、Exp と Log が逆であることを確認</li>
+<li>回転の合成の順番を入れ替えると結果が変わることを確認</li>
+<li>解析的に求めたヤコビアン <span class="arithmatex">\(-\mathbf{R}[\mathbf{p}]_\times\)</span> と数値微分が一致することを確認</li>
+<li>相対姿勢 <span class="arithmatex">\(\mathbf{T}_i^{-1}\mathbf{T}_j\)</span> で点を変換</li>
+</ul>
+<h2 id="理解度チェック">理解度チェック</h2>
+<ol>
+<li>回転行列が 9 個の数字を持つのに、自由度が 3 なのはなぜ?</li>
+<li><span class="arithmatex">\(\mathbf{T}_i\)</span>, <span class="arithmatex">\(\mathbf{T}_j\)</span> が世界座標での姿勢のとき、フレーム j で観測した点をフレーム i の座標に移す変換は?</li>
+<li>最適化の更新で <span class="arithmatex">\(\mathbf{R} + \Delta\mathbf{R}\)</span> としてはいけないのはなぜ? 代わりにどうする?</li>
+<li><span class="arithmatex">\(\dfrac{\partial(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})}{\partial\boldsymbol{\delta}}\)</span> を導出せよ。</li>
+</ol>
+<details>
+<summary>答えの例</summary>
+<ol>
+<li><span class="arithmatex">\(\mathbf{R}^\top\mathbf{R} = \mathbf{I}\)</span> (6 個の独立な条件) があるので、9 − 6 = 3 自由度。</li>
+<li><span class="arithmatex">\(\mathbf{T}_{ij} = \mathbf{T}_i^{-1}\mathbf{T}_j\)</span>。</li>
+<li>足し算すると直交性が崩れて回転行列でなくなる。回転ベクトル <span class="arithmatex">\(\boldsymbol{\delta}\)</span> で更新量を表し、<span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> と掛け算で更新する。</li>
+<li><span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta}) \approx \mathbf{I} + [\boldsymbol{\delta}]_\times\)</span> を使って <span class="arithmatex">\(-\mathbf{R}[\mathbf{p}]_\times\)</span>。</li>
+</ol>
+</details>
+<h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
+<ul>
+<li>J. Solà, J. Deray, D. Atchuthan, "A micro Lie theory for state estimation in robotics," arXiv:1812.01537, 2018.
+  (Lie 群を「使う側」の視点で短くまとめた定番資料)</li>
+<li>T. D. Barfoot, <em>State Estimation for Robotics</em>, Cambridge University Press. (無料 PDF あり)</li>
+</ul>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="01_coordinates_and_rotation"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="00_roadmap.html"><small>前へ</small>00 学習ロードマップ</a><a class="next" href="02_probability_and_least_squares.html"><small>次へ</small>02 確率と最小二乗</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

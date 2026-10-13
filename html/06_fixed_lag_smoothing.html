@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>固定ラグ平滑化と周辺化 | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html" aria-current="page"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 06 章</span><span class="chip opt">最適化</span><span class="chip lidar">LiDAR</span><span class="chip imu">IMU</span><span class="chip time">目安 2〜3 時間</span></div>
+<h1 id="06-固定ラグ平滑化と周辺化-ウィンドウ最適化">06. 固定ラグ平滑化と周辺化 (ウィンドウ最適化)</h1>
+<h2 id="この章のゴール">この章のゴール</h2>
+<ul>
+<li>「最新の数秒分の状態だけを最適化する」固定ラグ平滑化の流れを説明できる</li>
+<li>ウィンドウから外れる状態を <strong>周辺化</strong> して、その情報を残す方法 (シューア補行列) が分かる</li>
+<li>周辺化せずにただ捨てると何が起こるかを体験する</li>
+<li>疎結合と密結合の違い、キーフレームの役割が分かる</li>
+</ul>
+<blockquote>
+<p><strong>論文とのつながり</strong>
+論文の <span class="arithmatex">\(\mathcal{X}\)</span> は「最適化ウィンドウ内の状態 (例: 5 秒分)」、<span class="arithmatex">\(C(\mathcal{X})\)</span> は
+「ウィンドウ外に出た変数・因子を補償する周辺化因子」です。
+論文の手法は、著者の先行研究 [Koide+ ICRA2022] の <strong>固定ラグ平滑化による LiDAR-IMU オドメトリ</strong> をベースに、
+地図とのマッチング因子を追加したものです。</p>
+</blockquote>
+<hr />
+<h2 id="1-疎結合と密結合">1. 疎結合と密結合</h2>
+<p>LiDAR と IMU を組み合わせる方法は大きく 2 つあります。</p>
+<ul>
+<li><strong>疎結合 (loosely coupled)</strong>: LiDAR だけでスキャンマッチングして姿勢を求め、その「結果」を IMU とフィルタで融合する。
+  シンプルだが、LiDAR だけでは決まらない状況 (廊下など) でマッチング結果自体が崩れると立て直せない</li>
+<li><strong>密結合 (tightly coupled)</strong>: 点群のマッチングコストと IMU の制約を <strong>1 つの最適化問題</strong> に入れて同時に解く。
+  互いの弱点を最適化の中で補い合える</li>
+</ul>
+<p>論文の手法は密結合です。<a href="03_point_cloud_registration.html">03 章</a> の「コストそのものを因子にする」考え方が、密結合を自然に実現しています。</p>
+<h2 id="2-固定ラグ平滑化の流れ">2. 固定ラグ平滑化の流れ</h2>
+<p>固定ラグ平滑化 (fixed-lag smoothing) は、<strong>最新の L 秒分の状態だけ</strong> を変数として持ち、まとめて最適化します。
+新しい LiDAR フレームが来るたびに次を繰り返します。</p>
+<ol>
+<li><strong>予測</strong>: 直前の状態から IMU 事前積分で新しい状態 <span class="arithmatex">\(\mathbf{x}_i\)</span> を予測する (最適化の初期値になる)</li>
+<li><strong>因子の追加</strong>: IMU 因子・バイアス因子、直前フレームとのスキャンマッチング因子、地図マッチング因子を追加</li>
+<li><strong>最適化</strong>: ウィンドウ内の全状態を最適化 (論文では iSAM2)</li>
+<li><strong>周辺化</strong>: L 秒より古い状態をウィンドウから外し、その情報を周辺化因子 <span class="arithmatex">\(C(\mathcal{X})\)</span> に移す</li>
+</ol>
+<p>GLIM の設定 <code>smoother_lag</code> (既定値 5.0 秒) がこの L です。論文の「例: ウィンドウ長 5 秒」と一致します。</p>
+<h3 id="ウィンドウ最適化のうれしさ">ウィンドウ最適化のうれしさ</h3>
+<ul>
+<li>過去数秒の状態も <strong>新しい情報で修正される</strong> (フィルタは過去を修正できない)</li>
+<li>ウィンドウ内では何度でも <strong>再線形化</strong> できるので、非線形性に強い</li>
+<li>計算量はウィンドウの大きさで決まり、走行時間が延びても増えない</li>
+<li>一瞬だけ点群が使えない (センサの前を人が横切った、退化した) フレームがあっても、前後の数秒の情報で支えられる</li>
+</ul>
+<h2 id="3-周辺化-消す変数の情報を残す">3. 周辺化: 消す変数の情報を残す</h2>
+<p>ウィンドウから古い状態 <span class="arithmatex">\(\mathbf{x}_m\)</span> を消すとき、<span class="arithmatex">\(\mathbf{x}_m\)</span> に繋がっていた因子をただ捨てると、
+その因子が持っていた情報 (例えば「地図で確かめた位置」) も消えてしまいます。</p>
+<p><strong>周辺化 (marginalization)</strong> は、<span class="arithmatex">\(\mathbf{x}_m\)</span> について「積分して消す」操作で、
+ガウス分布 (2 次近似) の世界では <strong>シューア補行列</strong> で計算できます。</p>
+<p><span class="arithmatex">\(\mathbf{x}_m\)</span> に繋がる因子だけを集めて線形化し、変数を「消すもの <span class="arithmatex">\(m\)</span>」と「残すもの <span class="arithmatex">\(r\)</span>」に分けると</p>
+<div class="arithmatex">\[
+\begin{bmatrix} \mathbf{H}_{mm} & \mathbf{H}_{mr} \\ \mathbf{H}_{rm} & \mathbf{H}_{rr} \end{bmatrix}
+\begin{bmatrix} \boldsymbol{\delta}_m \\ \boldsymbol{\delta}_r \end{bmatrix}
+= -\begin{bmatrix} \mathbf{b}_m \\ \mathbf{b}_r \end{bmatrix}
+\]</div>
+<p>から <span class="arithmatex">\(\boldsymbol{\delta}_m\)</span> を消去して、</p>
+<div class="arithmatex">\[
+\mathbf{H}' = \mathbf{H}_{rr} - \mathbf{H}_{rm}\mathbf{H}_{mm}^{-1}\mathbf{H}_{mr},
+\qquad
+\mathbf{b}' = \mathbf{b}_r - \mathbf{H}_{rm}\mathbf{H}_{mm}^{-1}\mathbf{b}_m
+\]</div>
+<p>が得られます。<span class="arithmatex">\((\mathbf{H}', \mathbf{b}')\)</span> を持つ 2 次の項 (線形化された事前分布) を、残った変数に対する新しい因子として
+グラフに加えます。これが <span class="arithmatex">\(C(\mathcal{X})\)</span> です。</p>
+<p><img alt="周辺化のイメージ" src="figures/fig_marginalization.svg" /></p>
+<h3 id="注意点">注意点</h3>
+<ul>
+<li><strong>密になる</strong>: <span class="arithmatex">\(\mathbf{x}_m\)</span> に繋がっていた変数どうしが、新しい因子で全部つながる (fill-in)。
+  演習 6 の右の図で、ウィンドウの <span class="arithmatex">\(\mathbf{H}\)</span> の左上に密なブロックができているのがそれです</li>
+<li><strong>線形化点が固定される</strong>: 周辺化因子はそのときの推定値で線形化した 2 次式なので、後で推定値が大きく動くと近似が悪くなる。
+  理論的にはこれが推定の「一貫性」を損ねることがあり、研究テーマにもなっています (FEJ など)</li>
+<li><strong>確信が強すぎると修正が遅れる</strong>: 周辺化因子が強い (情報が多い) と、ウィンドウの古い側の状態がなかなか動かなくなる。
+  演習 7 では、地図のない区間からある区間に戻ったとき、ドリフトの修正がウィンドウ長 (3 秒) くらい遅れて効く様子が見られる</li>
+</ul>
+<p>GTSAM には固定ラグ平滑化と周辺化を iSAM2 と組み合わせて行う <code>IncrementalFixedLagSmoother</code> があります
+(バージョンによっては <code>gtsam_unstable</code> 側にあります)。著者の gtsam_points はそれを拡張した
+<code>IncrementalFixedLagSmootherExt</code> を持ち、GLIM のオドメトリでは最適化に失敗したときの立て直し機能を加えた
+<code>IncrementalFixedLagSmootherExtWithFallback</code> が使われています。</p>
+<h3 id="周辺化せずに捨てると">周辺化せずに捨てると?</h3>
+<p>演習 6 で <code>USE_MARGINALIZATION = False</code> にすると、地図 (絶対位置の観測) がない区間で
+ウィンドウの位置を決める手がかりがなくなり、誤差が約 7 倍 (0.17 m → 1.2 m) になります。
+周辺化が「過去の情報」をウィンドウに受け継いでいることが分かります。</p>
+<h2 id="4-スキャン間マッチングをどのフレームと取るか-キーフレーム">4. スキャン間マッチングをどのフレームと取るか: キーフレーム</h2>
+<p>論文の式では、最新の状態 <span class="arithmatex">\(\mathbf{x}_i\)</span> は <strong>直前の 2 フレーム</strong> (<span class="arithmatex">\(j = i-2, i-1\)</span>) とマッチングします。
+GLIM の設定 <code>full_connection_window_size</code> (設定ファイルの値は 2) がこれに対応します。</p>
+<p>さらに GLIM のオドメトリでは、<strong>キーフレーム</strong> (重なりの度合いなどで選んだ代表フレーム) ともマッチングします。</p>
+<ul>
+<li>キーフレームがウィンドウ内にあれば二項因子 <span class="arithmatex">\(f^P(\mathbf{x}_{\text{key}}, \mathbf{x}_i)\)</span></li>
+<li>キーフレームがウィンドウから出ていたら、その姿勢を固定した単項因子</li>
+</ul>
+<p>これにより、連続するフレームどうしの誤差が積み重なってドリフトするのを抑えています
+(論文本文ではキーフレームについては触れられていませんが、ベースになっている GLIM のオドメトリはこの仕組みを持っています)。</p>
+<blockquote>
+<p><strong>気づき</strong>: 「ウィンドウから出たキーフレームを固定した単項因子」は、構造としては
+「位置が固定された点群 (地図) とのマッチング因子」と同じです。論文の地図マッチング因子は、
+この「固定された点群」を <strong>事前に作った地図</strong> にしたものと見ることもできます。</p>
+</blockquote>
+<h2 id="5-ウィンドウ長のトレードオフ">5. ウィンドウ長のトレードオフ</h2>
+<table>
+<thead>
+<tr>
+<th>長くすると</th>
+<th>短くすると</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>精度・頑健性が上がる (多くの情報で支え合う)</td>
+<td>計算が軽い</td>
+</tr>
+<tr>
+<td>地図のない区間などを長く支えられる</td>
+<td>急な修正が速く効く</td>
+</tr>
+<tr>
+<td>計算が重くなる</td>
+<td>一時的な劣化に弱くなる</td>
+</tr>
+</tbody>
+</table>
+<h2 id="6-2d-再現実験で確かめる">6. 2D 再現実験で確かめる</h2>
+<p>演習 7 では、この章の内容をすべて組み込んだ 2D 版の推定器を動かします
+(スライディングウィンドウ、IMU 事前積分、VGICP 因子、周辺化)。
+結果の詳しい見方は <a href="08_paper_walkthrough.html">08 章</a> で扱います。</p>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex06_factor_graph.py<span class="w">                  </span><span class="c1"># 固定ラグと周辺化の基本</span>
+python<span class="w"> </span>exercises/ex07_sliding_window_localization.py<span class="w">   </span><span class="c1"># 論文の手法の 2D 版 (1〜3 分)</span>
+</code></pre></div>
+<h2 id="理解度チェック">理解度チェック</h2>
+<ol>
+<li>固定ラグ平滑化で、新しい状態の初期値には何を使う? なぜ?</li>
+<li>シューア補行列 <span class="arithmatex">\(\mathbf{H}_{rr} - \mathbf{H}_{rm}\mathbf{H}_{mm}^{-1}\mathbf{H}_{mr}\)</span> は何を表している?</li>
+<li>周辺化因子が密になるのはなぜ?</li>
+<li>フィルタと比べて、固定ラグ平滑化が非線形性に強いのはなぜ?</li>
+</ol>
+<details>
+<summary>答えの例</summary>
+<ol>
+<li>IMU 事前積分で前の状態から予測した値。短時間の IMU 予測は正確なので、スキャンマッチング (非線形最小二乗) の良い初期値になる。</li>
+<li>消した変数 <span class="arithmatex">\(\mathbf{x}_m\)</span> を積分 (周辺化) した後に、残った変数に残る情報行列。<span class="arithmatex">\(\mathbf{x}_m\)</span> を介して伝わっていた制約が、残った変数どうしの直接の制約になったもの。</li>
+<li><span class="arithmatex">\(\mathbf{x}_m\)</span> を介してつながっていた変数どうしが、<span class="arithmatex">\(\mathbf{x}_m\)</span> を消したことで直接つながるため。</li>
+<li>フィルタは一度線形化して取り込んだ情報を後で線形化し直せないが、平滑化はウィンドウ内の因子を推定値が更新されるたびに再線形化できるから。</li>
+</ol>
+</details>
+<h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
+<ul>
+<li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Globally Consistent and Tightly Coupled 3D LiDAR Inertial Mapping," ICRA 2022. (論文のベースになっているオドメトリ)</li>
+<li>K. Koide et al., "GLIM: 3D Range-Inertial Localization and Mapping with GPU-Accelerated Scan Matching Factors," Robotics and Autonomous Systems, 2024. (arXiv:2407.10344)</li>
+<li>G. Sibley, L. Matthies, G. Sukhatme, "Sliding Window Filter with Application to Planetary Landing," JFR 2010.</li>
+</ul>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="06_fixed_lag_smoothing"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="05_factor_graph.html"><small>前へ</small>05 ファクターグラフ</a><a class="next" href="07_map_based_localization.html"><small>次へ</small>07 既知地図上の自己位置推定</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

@@ -1,0 +1,91 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 600" width="720" height="600" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 15px; fill: #1f2733; font-weight: 700; }
+    .s { font-size: 12px; fill: #586273; }
+    .tg { fill: #8a93a3; }
+    .src { fill: #2a78d6; }
+    .ar { stroke: #eb6834; stroke-width: 1.6; fill: none; marker-end: url(#ah); }
+    .panel { fill: #ffffff; stroke: #dfe3ea; stroke-width: 1; }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="720" height="600" fill="#ffffff"/>
+
+  <!-- (a) point-to-point -->
+  <rect x="10" y="10" width="340" height="280" rx="10" class="panel"/>
+  <text x="26" y="38" class="t">(a) 点対点 ICP</text>
+  <text x="26" y="58" class="s">最も近い「点」との距離を縮める</text>
+  <line x1="40" y1="210" x2="320" y2="210" stroke="#dfe3ea" stroke-width="10" stroke-linecap="round"/>
+  <g class="tg">
+    <circle cx="60" cy="210" r="5"/><circle cx="120" cy="210" r="5"/><circle cx="180" cy="210" r="5"/>
+    <circle cx="240" cy="210" r="5"/><circle cx="300" cy="210" r="5"/>
+  </g>
+  <g class="src">
+    <circle cx="95" cy="140" r="5"/><circle cx="155" cy="140" r="5"/><circle cx="215" cy="140" r="5"/><circle cx="275" cy="140" r="5"/>
+  </g>
+  <path d="M97,146 L117,202" class="ar"/><path d="M157,146 L177,202" class="ar"/>
+  <path d="M213,146 L196,201" class="ar"/><path d="M273,146 L256,201" class="ar"/>
+  <text x="26" y="270" class="s">点の並び方が違うと、壁に沿う方向に</text>
+  <text x="26" y="286" class="s">余計な力がかかり、収束が遅い・偏る</text>
+
+  <!-- (b) point-to-plane -->
+  <rect x="370" y="10" width="340" height="280" rx="10" class="panel"/>
+  <text x="386" y="38" class="t">(b) 点対面 ICP</text>
+  <text x="386" y="58" class="s">最も近い点の「面 (2D なら線)」までの距離</text>
+  <line x1="400" y1="210" x2="680" y2="210" stroke="#dfe3ea" stroke-width="10" stroke-linecap="round"/>
+  <line x1="400" y1="210" x2="680" y2="210" stroke="#8a93a3" stroke-width="2"/>
+  <g class="tg">
+    <circle cx="420" cy="210" r="5"/><circle cx="480" cy="210" r="5"/><circle cx="540" cy="210" r="5"/>
+    <circle cx="600" cy="210" r="5"/><circle cx="660" cy="210" r="5"/>
+  </g>
+  <line x1="660" y1="210" x2="660" y2="172" stroke="#1f2733" stroke-width="1.4" marker-end="url(#ah)"/>
+  <text x="666" y="182" class="s">n</text>
+  <g class="src">
+    <circle cx="455" cy="140" r="5"/><circle cx="515" cy="140" r="5"/><circle cx="575" cy="140" r="5"/><circle cx="635" cy="140" r="5"/>
+  </g>
+  <path d="M455,146 L455,203" class="ar"/><path d="M515,146 L515,203" class="ar"/>
+  <path d="M575,146 L575,203" class="ar"/><path d="M635,146 L635,203" class="ar"/>
+  <text x="386" y="270" class="s">壁に沿う方向には力がかからない。</text>
+  <text x="386" y="286" class="s">誤差 = nᵀ(q − T p)</text>
+
+  <!-- (c) GICP -->
+  <rect x="10" y="310" width="340" height="280" rx="10" class="panel"/>
+  <text x="26" y="338" class="t">(c) GICP</text>
+  <text x="26" y="358" class="s">点を「正規分布 (楕円)」とみなし、分布同士を比べる</text>
+  <g fill="#8a93a3" fill-opacity="0.25" stroke="#8a93a3">
+    <ellipse cx="60" cy="510" rx="28" ry="4"/><ellipse cx="120" cy="510" rx="28" ry="4"/><ellipse cx="180" cy="510" rx="28" ry="4"/>
+    <ellipse cx="240" cy="510" rx="28" ry="4"/><ellipse cx="300" cy="510" rx="28" ry="4"/>
+  </g>
+  <g fill="#2a78d6" fill-opacity="0.2" stroke="#2a78d6">
+    <ellipse cx="95" cy="440" rx="28" ry="4"/><ellipse cx="155" cy="440" rx="28" ry="4"/>
+    <ellipse cx="215" cy="440" rx="28" ry="4"/><ellipse cx="275" cy="440" rx="28" ry="4"/>
+  </g>
+  <path d="M97,446 L117,503" class="ar"/><path d="M157,446 L177,503" class="ar"/>
+  <path d="M213,446 L196,502" class="ar"/><path d="M273,446 L256,502" class="ar"/>
+  <text x="26" y="568" class="s">誤差 dᵀ (C<tspan baseline-shift="sub" font-size="9">q</tspan> + R C<tspan baseline-shift="sub" font-size="9">p</tspan> Rᵀ)⁻¹ d : 細長い楕円の向きには</text>
+  <text x="26" y="584" class="s">ほとんど力がかからない (面対面のマッチング)</text>
+
+  <!-- (d) VGICP -->
+  <rect x="370" y="310" width="340" height="280" rx="10" class="panel"/>
+  <text x="386" y="338" class="t">(d) VGICP</text>
+  <text x="386" y="358" class="s">ターゲットをボクセルごとの分布にまとめておく</text>
+  <g stroke="#dfe3ea" stroke-width="1">
+    <path d="M400,380 L680,380 M400,450 L680,450 M400,520 L680,520 M400,380 L400,520 M470,380 L470,520 M540,380 L540,520 M610,380 L610,520 M680,380 L680,520"/>
+  </g>
+  <g fill="#8a93a3" fill-opacity="0.25" stroke="#8a93a3">
+    <ellipse cx="435" cy="488" rx="30" ry="5"/><ellipse cx="505" cy="489" rx="30" ry="5"/>
+    <ellipse cx="575" cy="490" rx="30" ry="5"/><ellipse cx="645" cy="491" rx="30" ry="5"/>
+  </g>
+  <g class="tg"><circle cx="435" cy="488" r="3"/><circle cx="505" cy="489" r="3"/><circle cx="575" cy="490" r="3"/><circle cx="645" cy="491" r="3"/></g>
+  <g class="src">
+    <circle cx="455" cy="470" r="5"/><circle cx="525" cy="470" r="5"/><circle cx="595" cy="470" r="5"/><circle cx="660" cy="470" r="5"/>
+  </g>
+  <path d="M452,474 L440,484" class="ar"/><path d="M522,474 L510,485" class="ar"/>
+  <path d="M592,474 L580,486" class="ar"/><path d="M656,474 L650,487" class="ar"/>
+  <text x="386" y="550" class="s">点が入ったボクセルの分布 1 つと比べるだけ。</text>
+  <text x="386" y="566" class="s">近傍探索 (kd-tree) が不要で、分岐が少なく</text>
+  <text x="386" y="582" class="s">GPU で大量の点を並列処理しやすい</text>
+</svg>

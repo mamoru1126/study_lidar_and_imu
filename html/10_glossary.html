@@ -1,0 +1,450 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>用語集 | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html" aria-current="page"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 10 章</span><span class="chip time">目安 辞書として</span></div>
+<h1 id="10-用語集">10. 用語集</h1>
+<p>論文や関連資料に出てくる用語を、日本語・英語の対応と一言の説明でまとめました。括弧内は主に説明している章です。</p>
+<h2 id="座標回転-01-章">座標・回転 (01 章)</h2>
+<table>
+<thead>
+<tr>
+<th>日本語</th>
+<th>英語</th>
+<th>一言で</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>姿勢</td>
+<td>pose</td>
+<td>位置と向きの組。3D では 6 自由度</td>
+</tr>
+<tr>
+<td>6 自由度</td>
+<td>6DoF (degrees of freedom)</td>
+<td>並進 3 + 回転 3</td>
+</tr>
+<tr>
+<td>回転行列</td>
+<td>rotation matrix</td>
+<td>向きを表す 3×3 の直交行列。SO(3) の要素</td>
+</tr>
+<tr>
+<td>同次変換行列</td>
+<td>homogeneous transformation</td>
+<td>回転と並進をまとめた 4×4 行列。SE(3) の要素</td>
+</tr>
+<tr>
+<td>相対姿勢</td>
+<td>relative pose</td>
+<td>2 つの姿勢の差。T_i^-1 T_j</td>
+</tr>
+<tr>
+<td>リー群</td>
+<td>Lie group</td>
+<td>回転や姿勢のように「滑らかに動かせる群」。SO(3), SE(3)</td>
+</tr>
+<tr>
+<td>接空間 / リー代数</td>
+<td>tangent space / Lie algebra</td>
+<td>群の 1 点に接する平らな空間。更新量を表す</td>
+</tr>
+<tr>
+<td>指数写像 / 対数写像</td>
+<td>exponential / logarithm map (Exp / Log)</td>
+<td>回転ベクトル ⇔ 回転行列 の変換</td>
+</tr>
+<tr>
+<td>hat 演算子</td>
+<td>hat operator, skew-symmetric matrix</td>
+<td>ベクトルを外積の行列 [ω]× にする</td>
+</tr>
+<tr>
+<td>摂動</td>
+<td>perturbation</td>
+<td>推定値に微小な変化を加えること。ヤコビアンの導出に使う</td>
+</tr>
+<tr>
+<td>外部パラメータ</td>
+<td>extrinsic parameters</td>
+<td>センサ同士の相対姿勢 (例: T_lidar_imu)</td>
+</tr>
+</tbody>
+</table>
+<h2 id="確率最適化-02-05-章">確率・最適化 (02, 05 章)</h2>
+<table>
+<thead>
+<tr>
+<th>日本語</th>
+<th>英語</th>
+<th>一言で</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>共分散行列</td>
+<td>covariance matrix</td>
+<td>多次元のばらつきの大きさと向き</td>
+</tr>
+<tr>
+<td>情報行列</td>
+<td>information matrix</td>
+<td>共分散の逆行列。確信の強さ</td>
+</tr>
+<tr>
+<td>マハラノビス距離</td>
+<td>Mahalanobis distance</td>
+<td>ばらつきを考慮した距離</td>
+</tr>
+<tr>
+<td>最尤推定 / 最大事後確率推定</td>
+<td>maximum likelihood / MAP estimation</td>
+<td>観測が最も起こりやすい状態を選ぶ</td>
+</tr>
+<tr>
+<td>非線形最小二乗</td>
+<td>nonlinear least squares</td>
+<td>誤差の 2 乗和の最小化</td>
+</tr>
+<tr>
+<td>ガウス・ニュートン法</td>
+<td>Gauss-Newton method</td>
+<td>線形化して正規方程式を解く反復法</td>
+</tr>
+<tr>
+<td>レーベンバーグ・マーカート法</td>
+<td>Levenberg-Marquardt method</td>
+<td>ダンピング付きの GN 法</td>
+</tr>
+<tr>
+<td>ヤコビアン</td>
+<td>Jacobian</td>
+<td>誤差を状態で微分した行列</td>
+</tr>
+<tr>
+<td>ヘッセ行列 (の近似)</td>
+<td>Hessian (approximation)</td>
+<td>H = JᵀJ</td>
+</tr>
+<tr>
+<td>線形化点</td>
+<td>linearization point</td>
+<td>1 次近似するときの基準の推定値</td>
+</tr>
+<tr>
+<td>局所解</td>
+<td>local minimum</td>
+<td>一番低くはない谷</td>
+</tr>
+<tr>
+<td>退化</td>
+<td>degeneracy</td>
+<td>観測から決まらない方向がある状態</td>
+</tr>
+<tr>
+<td>ロバストカーネル</td>
+<td>robust kernel (M-estimator)</td>
+<td>外れ値の影響を弱める重み関数</td>
+</tr>
+<tr>
+<td>ファクターグラフ</td>
+<td>factor graph</td>
+<td>変数と因子のグラフで推定問題を表す</td>
+</tr>
+<tr>
+<td>因子</td>
+<td>factor</td>
+<td>変数間の確率的な制約 (誤差項)</td>
+</tr>
+<tr>
+<td>単項 / 二項因子</td>
+<td>unary / binary factor</td>
+<td>1 つ / 2 つの変数に関係する因子</td>
+</tr>
+<tr>
+<td>スパース</td>
+<td>sparse</td>
+<td>行列のほとんどの要素が 0</td>
+</tr>
+<tr>
+<td>フィルイン</td>
+<td>fill-in</td>
+<td>分解や消去で新しく非ゼロ要素が増えること</td>
+</tr>
+<tr>
+<td>iSAM2</td>
+<td>incremental Smoothing and Mapping 2</td>
+<td>ベイズ木を使うインクリメンタル最適化</td>
+</tr>
+<tr>
+<td>ベイズ木</td>
+<td>Bayes tree</td>
+<td>iSAM2 が使う、分解結果を表す木構造</td>
+</tr>
+<tr>
+<td>GTSAM</td>
+<td>Georgia Tech Smoothing and Mapping</td>
+<td>ファクターグラフ最適化ライブラリ</td>
+</tr>
+</tbody>
+</table>
+<h2 id="点群処理-03-章">点群処理 (03 章)</h2>
+<table>
+<thead>
+<tr>
+<th>日本語</th>
+<th>英語</th>
+<th>一言で</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>点群</td>
+<td>point cloud</td>
+<td>3D 点の集合</td>
+</tr>
+<tr>
+<td>スキャンマッチング / 位置合わせ</td>
+<td>scan matching / registration</td>
+<td>2 つの点群を重ねる変換を求める</td>
+</tr>
+<tr>
+<td>ソース / ターゲット</td>
+<td>source / target</td>
+<td>動かす側 / 動かさない側の点群</td>
+</tr>
+<tr>
+<td>対応点</td>
+<td>correspondence</td>
+<td>同じ場所を表すと思われる点のペア</td>
+</tr>
+<tr>
+<td>ICP</td>
+<td>Iterative Closest Point</td>
+<td>最近傍点との距離を最小化する反復法</td>
+</tr>
+<tr>
+<td>点対面 ICP</td>
+<td>point-to-plane ICP</td>
+<td>面までの距離を使う ICP</td>
+</tr>
+<tr>
+<td>NDT</td>
+<td>Normal Distributions Transform</td>
+<td>ボクセルごとの正規分布に点を合わせる</td>
+</tr>
+<tr>
+<td>GICP</td>
+<td>Generalized ICP</td>
+<td>分布対分布のマッチング</td>
+</tr>
+<tr>
+<td>VGICP</td>
+<td>Voxelized GICP</td>
+<td>ボクセル化した GICP。GPU 向き</td>
+</tr>
+<tr>
+<td>ボクセル</td>
+<td>voxel</td>
+<td>空間を区切った立方体のマス</td>
+</tr>
+<tr>
+<td>ダウンサンプリング</td>
+<td>downsampling</td>
+<td>点を間引く</td>
+</tr>
+<tr>
+<td>kd 木</td>
+<td>k-d tree</td>
+<td>最近傍探索用の木構造</td>
+</tr>
+<tr>
+<td>法線</td>
+<td>normal</td>
+<td>面に垂直な向き</td>
+</tr>
+<tr>
+<td>マルチ解像度</td>
+<td>multi-resolution</td>
+<td>粗いボクセルと細かいボクセルの併用</td>
+</tr>
+<tr>
+<td>収束域</td>
+<td>basin of convergence</td>
+<td>正しく収束できる初期値の範囲</td>
+</tr>
+<tr>
+<td>マッチングコスト因子</td>
+<td>matching cost factor</td>
+<td>位置合わせの誤差関数そのものを因子にしたもの</td>
+</tr>
+<tr>
+<td>歪み補正</td>
+<td>deskewing, motion compensation</td>
+<td>スキャン中の動きによる点群の歪みを直す</td>
+</tr>
+</tbody>
+</table>
+<h2 id="imu-04-章">IMU (04 章)</h2>
+<table>
+<thead>
+<tr>
+<th>日本語</th>
+<th>英語</th>
+<th>一言で</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>慣性計測装置</td>
+<td>IMU (Inertial Measurement Unit)</td>
+<td>加速度計 + ジャイロ</td>
+</tr>
+<tr>
+<td>比力</td>
+<td>specific force</td>
+<td>加速度計が測る「加速度 − 重力」</td>
+</tr>
+<tr>
+<td>バイアス</td>
+<td>bias</td>
+<td>ゆっくり変化するオフセット誤差</td>
+</tr>
+<tr>
+<td>ランダムウォーク</td>
+<td>random walk</td>
+<td>バイアスの変化のモデル</td>
+</tr>
+<tr>
+<td>デッドレコニング</td>
+<td>dead reckoning</td>
+<td>動きの積分だけで位置を求めること</td>
+</tr>
+<tr>
+<td>ドリフト</td>
+<td>drift</td>
+<td>積分誤差がたまって推定がずれていくこと</td>
+</tr>
+<tr>
+<td>事前積分</td>
+<td>preintegration</td>
+<td>区間内の IMU 計測を始点非依存の量にまとめる</td>
+</tr>
+</tbody>
+</table>
+<h2 id="推定の枠組み自己位置推定-06-07-章">推定の枠組み・自己位置推定 (06, 07 章)</h2>
+<table>
+<thead>
+<tr>
+<th>日本語</th>
+<th>英語</th>
+<th>一言で</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>オドメトリ</td>
+<td>odometry</td>
+<td>相対的な動きの推定</td>
+</tr>
+<tr>
+<td>SLAM</td>
+<td>Simultaneous Localization and Mapping</td>
+<td>地図作成と自己位置推定を同時に行う</td>
+</tr>
+<tr>
+<td>自己位置推定</td>
+<td>localization</td>
+<td>既知の地図上で自分の姿勢を求める</td>
+</tr>
+<tr>
+<td>事前地図</td>
+<td>prior map</td>
+<td>あらかじめ作っておいた地図</td>
+</tr>
+<tr>
+<td>疎結合 / 密結合</td>
+<td>loosely / tightly coupled</td>
+<td>結果どうしを融合 / 生の制約を 1 つの問題で同時に解く</td>
+</tr>
+<tr>
+<td>平滑化</td>
+<td>smoothing</td>
+<td>過去の状態も含めて推定し直す</td>
+</tr>
+<tr>
+<td>固定ラグ平滑化</td>
+<td>fixed-lag smoothing</td>
+<td>最新の一定時間分だけを平滑化する</td>
+</tr>
+<tr>
+<td>スライディングウィンドウ</td>
+<td>sliding window</td>
+<td>固定ラグ平滑化の別名に近い</td>
+</tr>
+<tr>
+<td>周辺化</td>
+<td>marginalization</td>
+<td>変数を積分して消し、情報を残す</td>
+</tr>
+<tr>
+<td>シューア補行列</td>
+<td>Schur complement</td>
+<td>周辺化の計算に使う行列</td>
+</tr>
+<tr>
+<td>キーフレーム</td>
+<td>keyframe</td>
+<td>代表として残す一部のフレーム</td>
+</tr>
+<tr>
+<td>カルマンフィルタ / UKF</td>
+<td>Kalman filter / Unscented Kalman Filter</td>
+<td>予測と更新を繰り返す逐次推定</td>
+</tr>
+<tr>
+<td>パーティクルフィルタ / MCL</td>
+<td>particle filter / Monte Carlo Localization</td>
+<td>多数の仮説で分布を表す逐次推定</td>
+</tr>
+<tr>
+<td>距離場</td>
+<td>distance field</td>
+<td>各位置から最も近い物体までの距離の表</td>
+</tr>
+<tr>
+<td>ATE</td>
+<td>Absolute Trajectory Error</td>
+<td>推定軌跡と真の軌跡の誤差の指標</td>
+</tr>
+</tbody>
+</table>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="10_glossary"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="09_author_code_guide.html"><small>前へ</small>09 著者のコード案内</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 420" width="880" height="420" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 14px; fill: #1f2733; }
+    .s { font-size: 12px; fill: #586273; }
+    .lbl { font-size: 15px; fill: #1f2733; font-style: italic; }
+    .edge { stroke: #9aa3b0; stroke-width: 1.5; fill: none; }
+    .state { fill: #ffffff; stroke: #1f2733; stroke-width: 1.8; }
+  </style>
+  <rect x="0" y="0" width="880" height="420" fill="#ffffff"/>
+
+  <!-- window -->
+  <rect x="150" y="34" width="640" height="262" rx="14" fill="#f4f7fc" stroke="#2a78d6" stroke-width="1.4" stroke-dasharray="6 5"/>
+  <text x="166" y="56" class="t" font-weight="700" fill="#2a78d6">最適化ウィンドウ (例: 最新 5 秒分の状態)</text>
+  <text x="810" y="196" class="s">時間 →</text>
+
+  <!-- marginalized state -->
+  <circle cx="70" cy="190" r="26" fill="#ffffff" stroke="#c3c8d1" stroke-width="1.5" stroke-dasharray="4 3"/>
+  <text x="70" y="195" class="lbl" text-anchor="middle" fill="#9aa3b0">x<tspan baseline-shift="sub" font-size="11">i-5</tspan></text>
+  <text x="70" y="240" class="s" text-anchor="middle">周辺化された</text>
+  <text x="70" y="256" class="s" text-anchor="middle">古い状態</text>
+
+  <!-- IMU chain -->
+  <path d="M226,190 L304,190 M356,190 L434,190 M486,190 L564,190 M616,190 L694,190" class="edge"/>
+
+  <!-- scan factors j = i-1 -->
+  <path d="M212,167 Q265,105 318,167" class="edge"/>
+  <path d="M342,167 Q395,105 448,167" class="edge"/>
+  <path d="M472,167 Q525,105 578,167" class="edge"/>
+  <path d="M602,167 Q655,105 708,167" class="edge"/>
+  <!-- scan factors j = i-2 -->
+  <path d="M200,164 Q330,30 460,164" class="edge"/>
+  <path d="M330,164 Q460,30 590,164" class="edge"/>
+  <path d="M460,164 Q590,30 720,164" class="edge"/>
+
+  <!-- marginalization prior -->
+  <path d="M214,207 Q265,252 316,207" class="edge"/>
+  <path d="M96,190 C140,190 175,230 252,230" class="edge" stroke-dasharray="4 4"/>
+
+  <!-- map factors -->
+  <path d="M200,216 L200,262 M330,216 L330,262 M460,216 L460,262 M590,216 L590,262 M720,216 L720,262" class="edge"/>
+  <path d="M200,274 L200,318 M330,274 L330,318 M460,274 L460,318 M590,274 L590,318 M720,274 L720,318" class="edge" stroke-dasharray="3 3"/>
+  <rect x="150" y="318" width="640" height="34" rx="6" fill="#e3f5ee" stroke="#1baf7a" stroke-width="1.2"/>
+  <text x="470" y="340" class="t" text-anchor="middle">地図点群 m (固定。最適化される変数ではない)</text>
+
+  <!-- factor squares -->
+  <g fill="#eb6834">
+    <rect x="259" y="184" width="12" height="12"/><rect x="389" y="184" width="12" height="12"/>
+    <rect x="519" y="184" width="12" height="12"/><rect x="649" y="184" width="12" height="12"/>
+  </g>
+  <g fill="#2a78d6">
+    <rect x="259" y="130" width="12" height="12"/><rect x="389" y="130" width="12" height="12"/>
+    <rect x="519" y="130" width="12" height="12"/><rect x="649" y="130" width="12" height="12"/>
+    <rect x="324" y="91" width="12" height="12"/><rect x="454" y="91" width="12" height="12"/>
+    <rect x="584" y="91" width="12" height="12"/>
+  </g>
+  <g fill="#1baf7a">
+    <rect x="194" y="262" width="12" height="12"/><rect x="324" y="262" width="12" height="12"/>
+    <rect x="454" y="262" width="12" height="12"/><rect x="584" y="262" width="12" height="12"/>
+    <rect x="714" y="262" width="12" height="12"/>
+  </g>
+  <rect x="259" y="224" width="12" height="12" fill="#8a93a3"/>
+
+  <!-- states -->
+  <circle cx="200" cy="190" r="26" class="state"/>
+  <circle cx="330" cy="190" r="26" class="state"/>
+  <circle cx="460" cy="190" r="26" class="state"/>
+  <circle cx="590" cy="190" r="26" class="state"/>
+  <circle cx="720" cy="190" r="26" class="state" stroke="#2a78d6" stroke-width="2.6"/>
+  <text x="200" y="195" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="11">i-4</tspan></text>
+  <text x="330" y="195" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="11">i-3</tspan></text>
+  <text x="460" y="195" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="11">i-2</tspan></text>
+  <text x="590" y="195" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="11">i-1</tspan></text>
+  <text x="720" y="195" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="11">i</tspan></text>
+  <text x="752" y="168" class="s" fill="#2a78d6">最新</text>
+
+  <!-- legend -->
+  <g transform="translate(40,378)">
+    <circle cx="8" cy="8" r="8" class="state"/><text x="22" y="13" class="s">状態 (姿勢・速度・バイアス)</text>
+    <rect x="200" y="2" width="12" height="12" fill="#2a78d6"/><text x="218" y="13" class="s">スキャン間 f<tspan baseline-shift="super" font-size="9">P</tspan>(x<tspan baseline-shift="sub" font-size="9">i</tspan>, x<tspan baseline-shift="sub" font-size="9">j</tspan>)</text>
+    <rect x="360" y="2" width="12" height="12" fill="#1baf7a"/><text x="378" y="13" class="s">地図 f<tspan baseline-shift="super" font-size="9">P</tspan>(x<tspan baseline-shift="sub" font-size="9">i</tspan>, m)</text>
+    <rect x="490" y="2" width="12" height="12" fill="#eb6834"/><text x="508" y="13" class="s">IMU f<tspan baseline-shift="super" font-size="9">I</tspan>(x<tspan baseline-shift="sub" font-size="9">i-1</tspan>, x<tspan baseline-shift="sub" font-size="9">i</tspan>)</text>
+    <rect x="630" y="2" width="12" height="12" fill="#8a93a3"/><text x="648" y="13" class="s">周辺化 C(X)</text>
+  </g>
+</svg>

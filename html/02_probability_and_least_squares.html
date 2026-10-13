@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>確率と最小二乗 | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html" aria-current="page"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 02 章</span><span class="chip math">数学</span><span class="chip opt">最適化</span><span class="chip time">目安 2 時間</span></div>
+<h1 id="02-確率と最小二乗-ガウス分布ガウスニュートン法">02. 確率と最小二乗 (ガウス分布・ガウス・ニュートン法)</h1>
+<h2 id="この章のゴール">この章のゴール</h2>
+<ul>
+<li>センサのノイズを正規分布 (ガウス分布) と共分散行列で表せる</li>
+<li>マハラノビス距離と「情報行列 = 共分散の逆行列」の意味が分かる</li>
+<li>「もっともらしい状態を探す」ことが「重み付き最小二乗問題を解く」ことになる理由が分かる</li>
+<li>ガウス・ニュートン法 / レーベンバーグ・マーカート法の手順を説明できる</li>
+<li>初期値が悪いと局所解に落ちることを体験する</li>
+</ul>
+<blockquote>
+<p><strong>論文とのつながり</strong>
+論文のコスト関数 <span class="arithmatex">\(F(\mathcal{X})\)</span> は、すべての因子の「誤差の 2 乗 (マハラノビス距離)」の和です。
+これを最小にする状態を、GTSAM (iSAM2) が内部でガウス・ニュートン法の仲間を使って求めています。
+GICP が使う「分布同士の距離」もマハラノビス距離そのものです。</p>
+</blockquote>
+<hr />
+<h2 id="1-ノイズを分布で表す">1. ノイズを分布で表す</h2>
+<p>センサの測定値には必ずノイズが乗ります。1 次元なら、真値 <span class="arithmatex">\(\mu\)</span> の周りに標準偏差 <span class="arithmatex">\(\sigma\)</span> でばらつく
+正規分布 <span class="arithmatex">\(\mathcal{N}(\mu, \sigma^2)\)</span> でモデル化するのが基本です。</p>
+<p>多次元 (例えば 3 次元の点の位置) では <strong>共分散行列</strong> <span class="arithmatex">\(\boldsymbol{\Sigma}\)</span> を使います。</p>
+<div class="arithmatex">\[
+p(\mathbf{z}) \propto \exp\!\left(-\tfrac{1}{2}(\mathbf{z} - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{z} - \boldsymbol{\mu})\right)
+\]</div>
+<p>共分散行列は「どの方向にどれくらいばらつくか」を表し、等確率の線は <strong>楕円 (3D なら楕円体)</strong> になります。
+固有ベクトルが楕円の軸の向き、固有値の平方根が軸の長さ (標準偏差) です。</p>
+<blockquote>
+<p><strong>点群との関係</strong>: 平らな壁の上の点を集めて共分散を計算すると、壁に沿う 2 方向には大きく、
+壁に垂直な方向には小さい「平たい楕円体」になります。GICP はこれを「面の形」として利用します
+(<a href="03_point_cloud_registration.html">03 章</a>)。</p>
+</blockquote>
+<h2 id="2-マハラノビス距離と情報行列">2. マハラノビス距離と情報行列</h2>
+<p>誤差ベクトル <span class="arithmatex">\(\mathbf{e}\)</span> の「大きさ」を、ばらつきを考慮して測るのが <strong>マハラノビス距離</strong> です。</p>
+<div class="arithmatex">\[
+\lVert \mathbf{e} \rVert^2_{\boldsymbol{\Sigma}} = \mathbf{e}^\top \boldsymbol{\Sigma}^{-1} \mathbf{e} = \mathbf{e}^\top \boldsymbol{\Omega}\, \mathbf{e}
+\]</div>
+<ul>
+<li>ばらつきが大きい方向 (不確かな方向) の誤差は小さく数える</li>
+<li>ばらつきが小さい方向 (確かな方向) の誤差は大きく数える</li>
+</ul>
+<p><span class="arithmatex">\(\boldsymbol{\Omega} = \boldsymbol{\Sigma}^{-1}\)</span> を <strong>情報行列</strong> と呼びます。「情報が多い = 確信が強い」方向ほど値が大きくなります。</p>
+<p>計算上は、<span class="arithmatex">\(\boldsymbol{\Omega} = \mathbf{L}\mathbf{L}^\top\)</span> と分解 (コレスキー分解) して <span class="arithmatex">\(\mathbf{r} = \mathbf{L}^\top\mathbf{e}\)</span> とすれば、
+<span class="arithmatex">\(\mathbf{e}^\top\boldsymbol{\Omega}\mathbf{e} = \lVert\mathbf{r}\rVert^2\)</span> という普通の 2 乗和になります。これを <strong>白色化</strong> と呼びます。</p>
+<h2 id="3-もっともらしい状態--最小二乗の解">3. もっともらしい状態 = 最小二乗の解</h2>
+<p>状態 <span class="arithmatex">\(\mathbf{x}\)</span> (例: ロボットの位置) から観測 <span class="arithmatex">\(\mathbf{z}_k\)</span> を予測する関数 <span class="arithmatex">\(h_k(\mathbf{x})\)</span> があり、
+観測ノイズが正規分布だとします。すべての観測が独立なら、観測が得られる確率 (尤度) は</p>
+<div class="arithmatex">\[
+p(\mathbf{z}_1, \dots, \mathbf{z}_K \mid \mathbf{x}) \propto \prod_k \exp\!\left(-\tfrac{1}{2}\lVert h_k(\mathbf{x}) - \mathbf{z}_k \rVert^2_{\boldsymbol{\Sigma}_k}\right)
+\]</div>
+<p>です。この確率を最大にする <span class="arithmatex">\(\mathbf{x}\)</span> (最尤推定) を求めたいのですが、対数を取ってマイナスを掛けると</p>
+<div class="arithmatex">\[
+\hat{\mathbf{x}} = \arg\min_{\mathbf{x}} \sum_k \lVert h_k(\mathbf{x}) - \mathbf{z}_k \rVert^2_{\boldsymbol{\Sigma}_k}
+\]</div>
+<p>という <strong>重み付き最小二乗問題</strong> になります。事前分布 (前もって分かっている情報) も同じ形の項として足せるので、
+最大事後確率 (MAP) 推定も同じ形です。</p>
+<p><strong>論文の <span class="arithmatex">\(F(\mathcal{X})\)</span> はまさにこの形</strong>で、各因子が <span class="arithmatex">\(\lVert \cdot \rVert^2_{\boldsymbol{\Sigma}}\)</span> の項 1 つ (またはその和) に対応します。</p>
+<h2 id="4-ガウスニュートン法">4. ガウス・ニュートン法</h2>
+<p><span class="arithmatex">\(h_k\)</span> が非線形だと一発では解けないので、<strong>線形化して少しずつ改善</strong>します。
+残差を <span class="arithmatex">\(\mathbf{r}(\mathbf{x})\)</span> (白色化済み) とまとめて書き、今の推定値 <span class="arithmatex">\(\mathbf{x}_0\)</span> の周りで 1 次近似します。</p>
+<div class="arithmatex">\[
+\mathbf{r}(\mathbf{x}_0 \boxplus \boldsymbol{\delta}) \approx \mathbf{r}_0 + \mathbf{J}\boldsymbol{\delta}
+\]</div>
+<p>ここで <span class="arithmatex">\(\mathbf{J}\)</span> はヤコビアン、<span class="arithmatex">\(\boxplus\)</span> は「状態に更新量を足す」操作です
+(回転なら <span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span>、<a href="01_coordinates_and_rotation.html">01 章</a>)。
+<span class="arithmatex">\(\lVert\mathbf{r}_0 + \mathbf{J}\boldsymbol{\delta}\rVert^2\)</span> を最小にする <span class="arithmatex">\(\boldsymbol{\delta}\)</span> は、次の <strong>正規方程式</strong> の解です。</p>
+<div class="arithmatex">\[
+\underbrace{\mathbf{J}^\top\mathbf{J}}_{\mathbf{H}}\,\boldsymbol{\delta} = -\underbrace{\mathbf{J}^\top\mathbf{r}_0}_{\mathbf{b}}
+\]</div>
+<p>手順は次の繰り返しです。</p>
+<ol>
+<li>今の推定値で残差 <span class="arithmatex">\(\mathbf{r}_0\)</span> とヤコビアン <span class="arithmatex">\(\mathbf{J}\)</span> を計算する</li>
+<li><span class="arithmatex">\(\mathbf{H} = \mathbf{J}^\top\mathbf{J}\)</span>、<span class="arithmatex">\(\mathbf{b} = \mathbf{J}^\top\mathbf{r}_0\)</span> を作る</li>
+<li><span class="arithmatex">\(\mathbf{H}\boldsymbol{\delta} = -\mathbf{b}\)</span> を解く</li>
+<li><span class="arithmatex">\(\mathbf{x} \leftarrow \mathbf{x} \boxplus \boldsymbol{\delta}\)</span> と更新する。<span class="arithmatex">\(\boldsymbol{\delta}\)</span> が十分小さくなったら終了</li>
+</ol>
+<p><span class="arithmatex">\(\mathbf{H}\)</span> は <strong>ヘッセ行列の近似</strong> で、因子ごとの <span class="arithmatex">\(\mathbf{J}_k^\top\mathbf{J}_k\)</span> を足し合わせて作れます。
+これが後で出てくる「ファクターグラフのスパース性」(<a href="05_factor_graph.html">05 章</a>) につながります。</p>
+<h2 id="5-レーベンバーグマーカート-lm-法">5. レーベンバーグ・マーカート (LM) 法</h2>
+<p>ガウス・ニュートン法は、線形近似が悪い (初期値が遠い) と大きく飛びすぎることがあります。
+LM 法は、<span class="arithmatex">\(\mathbf{H}\)</span> に「ダンピング」を足して慎重に進みます。</p>
+<div class="arithmatex">\[
+(\mathbf{H} + \lambda\,\operatorname{diag}(\mathbf{H}))\,\boldsymbol{\delta} = -\mathbf{b}
+\]</div>
+<p>コストが下がれば <span class="arithmatex">\(\lambda\)</span> を小さく (ガウス・ニュートン法に近づける)、上がれば <span class="arithmatex">\(\lambda\)</span> を大きく (勾配降下法に近づける) します。
+GLIM の設定にある <code>use_isam2_dogleg</code> の Dogleg 法も、同じ目的の別の工夫です。</p>
+<h2 id="6-初期値と局所解">6. 初期値と局所解</h2>
+<p>非線形最小二乗は、<strong>コスト関数の谷が複数ある</strong>と、初期値の近くの谷 (局所解) に落ちます。
+演習 2 では、精度の良い 2 つのランドマークが一直線上に並んでいるせいで、「線で折り返した位置」にも谷ができ、
+下側から始めると間違った位置に収束する様子が見られます。</p>
+<p><img alt="コスト関数の等高線と最適化の軌跡" src="figures/ex02_least_squares.png" /></p>
+<blockquote>
+<p><strong>論文とのつながり</strong>: スキャンマッチングも非線形最小二乗なので、初期値が悪いと間違った位置に合ってしまいます。
+論文の手法では、<strong>IMU で予測した姿勢を初期値</strong>に使うので、毎フレーム良い初期値から始められます。</p>
+</blockquote>
+<h2 id="7-推定の不確かさと退化">7. 推定の不確かさと「退化」</h2>
+<p>解の近くでは、<span class="arithmatex">\(\mathbf{H}^{-1}\)</span> が推定値の共分散の近似になります (演習 2 の楕円)。</p>
+<p><span class="arithmatex">\(\mathbf{H}\)</span> のある方向の固有値が 0 に近いと、その方向は <strong>観測から決まらない</strong> ことを意味します。
+これを <strong>退化 (degeneracy)</strong> と呼びます。例えば:</p>
+<ul>
+<li>長い廊下: 壁が平行に続くので、前後方向の位置がスキャンマッチングで決まらない</li>
+<li>広い平面: 平面に沿った移動が決まらない</li>
+</ul>
+<p>このようなとき、IMU など他の情報を同じ最適化に入れておくと、決まらない方向を補ってくれます。
+これが <strong>密結合 (tightly coupled)</strong> の大きな利点です (<a href="06_fixed_lag_smoothing.html">06 章</a>)。</p>
+<h2 id="8-外れ値とロバストカーネル">8. 外れ値とロバストカーネル</h2>
+<p>人や車などの動くものに当たった点は、地図と合わない「外れ値」になります。
+2 乗誤差は大きな誤差を過大に数えるので、外れ値に引っ張られます。
+対策として、誤差が大きいほど重みを下げる <strong>ロバストカーネル</strong> (Huber, Cauchy など) がよく使われます。
+GICP 系の手法では、対応点を探す距離に上限を設ける (遠すぎる対応は使わない) ことも同じ効果を持ちます。</p>
+<h2 id="演習-2">演習 2</h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex02_least_squares.py
+</code></pre></div>
+<ul>
+<li>ガウス・ニュートン法と LM 法で、ランドマークまでの距離から位置を推定する</li>
+<li>初期値によって局所解に落ちることを確認する</li>
+<li>センサの精度の違いを重み (情報行列) で入れると、平均的な精度が良くなることを 2000 回の試行で確認する</li>
+<li><span class="arithmatex">\(\mathbf{H}^{-1}\)</span> から推定の不確かさ (楕円) を描く</li>
+</ul>
+<h2 id="理解度チェック">理解度チェック</h2>
+<ol>
+<li>共分散 <span class="arithmatex">\(\boldsymbol{\Sigma}\)</span> と情報行列 <span class="arithmatex">\(\boldsymbol{\Omega}\)</span> の関係は? 「情報が多い」とはどういう状態?</li>
+<li>観測ノイズが正規分布のとき、最尤推定が最小二乗になるのはなぜ?</li>
+<li>ガウス・ニュートン法の 1 ステップで解く方程式を書け。</li>
+<li>長い廊下でスキャンマッチングが苦手なのはなぜ? <span class="arithmatex">\(\mathbf{H}\)</span> の言葉で説明せよ。</li>
+</ol>
+<details>
+<summary>答えの例</summary>
+<ol>
+<li><span class="arithmatex">\(\boldsymbol{\Omega} = \boldsymbol{\Sigma}^{-1}\)</span>。ばらつき (分散) が小さく、値に強い確信がある状態。</li>
+<li>正規分布の確率密度は <span class="arithmatex">\(\exp(-\frac{1}{2}\text{マハラノビス距離}^2)\)</span> の形なので、対数を取ると 2 乗誤差の和になり、確率最大 ⇔ 2 乗和最小になる。</li>
+<li><span class="arithmatex">\(\mathbf{J}^\top\mathbf{J}\,\boldsymbol{\delta} = -\mathbf{J}^\top\mathbf{r}\)</span>。</li>
+<li>廊下の前後方向に動いても点群の見た目がほとんど変わらないので、その方向の <span class="arithmatex">\(\mathbf{H}\)</span> の固有値がほぼ 0 になり、位置が決まらない (退化)。</li>
+</ol>
+</details>
+<h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
+<ul>
+<li>F. Dellaert, M. Kaess, "Factor Graphs for Robot Perception," Foundations and Trends in Robotics, 2017.</li>
+<li>K. Madsen, H. B. Nielsen, O. Tingleff, "Methods for Non-Linear Least Squares Problems," 2004. (無料 PDF)</li>
+</ul>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="02_probability_and_least_squares"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="01_coordinates_and_rotation.html"><small>前へ</small>01 座標と回転</a><a class="next" href="03_point_cloud_registration.html"><small>次へ</small>03 スキャンマッチング</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

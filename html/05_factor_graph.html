@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ファクターグラフ | LiDAR×IMU 論文ノート</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@400;500&family=Zen+Kaku+Gothic+New:wght@500;700&display=swap">
+<link rel="stylesheet" href="assets/style.css">
+<link rel="stylesheet" href="assets/katex/katex.css">
+<script defer src="assets/katex/katex.min.js"></script>
+<script defer src="assets/katex/auto-render.min.js"></script>
+</head>
+<body>
+<header class="topbar">
+  <a class="brand" href="index.html"><svg class="brand-mark" viewBox="0 0 24 24" aria-hidden="true"><circle cx="6" cy="18" r="2.6" fill="var(--imu)"/><path d="M6 11a7 7 0 0 1 7 7" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round"/><path d="M6 5a13 13 0 0 1 13 13" fill="none" stroke="var(--lidar)" stroke-width="2" stroke-linecap="round" opacity=".55"/></svg><span>LiDAR×IMU 論文ノート</span></a>
+  <button class="menu-btn" type="button" aria-expanded="false" aria-label="目次を開く">目次</button>
+</header>
+<div class="layout">
+<nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html" aria-current="page"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
+<main>
+<article class="article">
+<div class="chapter-meta"><span class="chip time">第 05 章</span><span class="chip opt">最適化</span><span class="chip time">目安 2 時間</span></div>
+<h1 id="05-ファクターグラフ-gtsam-と-isam2">05. ファクターグラフ (GTSAM と iSAM2)</h1>
+<h2 id="この章のゴール">この章のゴール</h2>
+<ul>
+<li>ファクターグラフ (変数と因子のグラフ) で推定問題を表せる</li>
+<li>因子が「関係する変数のところだけ」に情報を足すので、問題が <strong>スパース (疎)</strong> になることが分かる</li>
+<li>GTSAM の基本的な使い方 (グラフ・初期値・最適化) のイメージを持つ</li>
+<li>iSAM2 が「新しい因子が来るたびに、必要な部分だけ計算し直す」手法であることが分かる</li>
+</ul>
+<blockquote>
+<p><strong>論文とのつながり</strong>
+論文の手法は GTSAM で実装され、最適化には iSAM2 を使っています。
+論文のコスト関数 <span class="arithmatex">\(F(\mathcal{X})\)</span> は、そのまま 1 つのファクターグラフとして描けます (下図)。</p>
+</blockquote>
+<hr />
+<h2 id="1-ファクターグラフとは">1. ファクターグラフとは</h2>
+<p>推定したい量を <strong>変数 (variable)</strong> 、変数どうしの関係を表す確率的な制約を <strong>因子 (factor)</strong> として、
+両者をつないだグラフです。</p>
+<ul>
+<li>変数: 各時刻の状態 <span class="arithmatex">\(\mathbf{x}_i\)</span> (姿勢・速度・バイアス)</li>
+<li>因子: センサ観測などから決まる「この変数たちはこういう関係にあるはず」という制約。
+  1 つ 1 つが <span class="arithmatex">\(\lVert\text{誤差}\rVert^2_{\boldsymbol{\Sigma}}\)</span> の項になる</li>
+</ul>
+<p>すべての因子の積が事後確率に比例し、その最大化は (<a href="02_probability_and_least_squares.html">02 章</a> の通り)
+すべての因子の 2 乗誤差の和の最小化になります。</p>
+<div class="arithmatex">\[
+\hat{\mathcal{X}} = \arg\min_{\mathcal{X}} \sum_{\text{因子 } k} \lVert \mathbf{e}_k(\mathcal{X}_k) \rVert^2_{\boldsymbol{\Sigma}_k}
+\qquad (\mathcal{X}_k: \text{因子 } k \text{ に関係する変数だけ})
+\]</div>
+<p>論文の式を描くと次のようになります。</p>
+<p><img alt="論文のファクターグラフ" src="figures/fig_factor_graph.svg" /></p>
+<table>
+<thead>
+<tr>
+<th>因子</th>
+<th>つながる変数</th>
+<th>色</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>スキャン間マッチング f^P(x_i, x_j)</td>
+<td>2 つ (最新とその 1〜2 個前)</td>
+<td>青</td>
+</tr>
+<tr>
+<td>地図マッチング f^P(x_i, M)</td>
+<td>1 つ (地図は固定なので変数ではない)</td>
+<td>緑</td>
+</tr>
+<tr>
+<td>IMU 事前積分 f^I(x_{i-1}, x_i)</td>
+<td>2 つ (連続する状態)</td>
+<td>オレンジ</td>
+</tr>
+<tr>
+<td>周辺化 C(X)</td>
+<td>ウィンドウの古い端の数個</td>
+<td>灰色</td>
+</tr>
+</tbody>
+</table>
+<p>1 つの変数だけにつながる因子を <strong>単項因子 (unary factor)</strong>、
+2 つにつながる因子を <strong>二項因子 (binary factor)</strong> と呼びます。地図マッチング因子は単項因子です。</p>
+<h2 id="2-スパース性-因子は関係する変数にしか効かない">2. スパース性: 因子は関係する変数にしか効かない</h2>
+<p>ガウス・ニュートン法の <span class="arithmatex">\(\mathbf{H} = \sum_k \mathbf{J}_k^\top\mathbf{J}_k\)</span> を考えます。
+因子 <span class="arithmatex">\(k\)</span> のヤコビアン <span class="arithmatex">\(\mathbf{J}_k\)</span> は、関係する変数の列だけが非ゼロです。
+したがって <span class="arithmatex">\(\mathbf{J}_k^\top\mathbf{J}_k\)</span> も、関係する変数どうしのブロックだけが非ゼロになります。</p>
+<ul>
+<li>単項因子 → 対角ブロック 1 つ</li>
+<li>二項因子 <span class="arithmatex">\((i, j)\)</span> → ブロック <span class="arithmatex">\((i,i), (i,j), (j,i), (j,j)\)</span></li>
+</ul>
+<p>時系列のグラフでは、近い時刻どうしにしか因子がないので、<span class="arithmatex">\(\mathbf{H}\)</span> は <strong>帯状のスパース行列</strong> になります。</p>
+<p><img alt="H のスパース性" src="figures/ex06_factor_graph.png" /></p>
+<p>(中央の図: 60 個の姿勢を一括最適化したときの <span class="arithmatex">\(\mathbf{H}\)</span>。非ゼロ要素は全体の約 3%)</p>
+<p>スパースな行列は、専用の分解 (スパースなコレスキー分解など) で非常に速く解けます。
+変数の並べ方 (消去順序) によって分解中に生まれる非ゼロ要素 (fill-in) の量が変わるので、
+GTSAM は COLAMD などで良い順序を自動的に選びます。</p>
+<h2 id="3-gtsam-の基本">3. GTSAM の基本</h2>
+<p>GTSAM (Georgia Tech Smoothing and Mapping) は、ファクターグラフで推定問題を解く C++ ライブラリです
+(Python ラッパーもあります)。基本の流れは次の 3 ステップです。</p>
+<div class="highlight"><pre><span></span><code><span class="kn">import</span><span class="w"> </span><span class="nn">gtsam</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">gtsam.symbol_shorthand</span><span class="w"> </span><span class="kn">import</span> <span class="n">X</span><span class="p">,</span> <span class="n">V</span><span class="p">,</span> <span class="n">B</span>   <span class="c1"># 変数の名前 (キー): X(3) = 3 番目の姿勢 など</span>
+
+<span class="n">graph</span> <span class="o">=</span> <span class="n">gtsam</span><span class="o">.</span><span class="n">NonlinearFactorGraph</span><span class="p">()</span>           <span class="c1"># 1. 因子を並べる</span>
+<span class="n">graph</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gtsam</span><span class="o">.</span><span class="n">PriorFactorPose3</span><span class="p">(</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">pose0</span><span class="p">,</span> <span class="n">noise</span><span class="p">))</span>            <span class="c1"># 単項因子</span>
+<span class="n">graph</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gtsam</span><span class="o">.</span><span class="n">BetweenFactorPose3</span><span class="p">(</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">X</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">rel_pose</span><span class="p">,</span> <span class="n">noise</span><span class="p">))</span>  <span class="c1"># 二項因子</span>
+<span class="n">graph</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="n">gtsam</span><span class="o">.</span><span class="n">ImuFactor</span><span class="p">(</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">V</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">X</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">V</span><span class="p">(</span><span class="mi">1</span><span class="p">),</span> <span class="n">B</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">pim</span><span class="p">))</span>     <span class="c1"># IMU 因子 (5 変数)</span>
+
+<span class="n">initial</span> <span class="o">=</span> <span class="n">gtsam</span><span class="o">.</span><span class="n">Values</span><span class="p">()</span>                       <span class="c1"># 2. 変数の初期値を入れる</span>
+<span class="n">initial</span><span class="o">.</span><span class="n">insert</span><span class="p">(</span><span class="n">X</span><span class="p">(</span><span class="mi">0</span><span class="p">),</span> <span class="n">pose0_guess</span><span class="p">)</span>
+<span class="o">...</span>
+
+<span class="n">result</span> <span class="o">=</span> <span class="n">gtsam</span><span class="o">.</span><span class="n">LevenbergMarquardtOptimizer</span><span class="p">(</span><span class="n">graph</span><span class="p">,</span> <span class="n">initial</span><span class="p">)</span><span class="o">.</span><span class="n">optimize</span><span class="p">()</span>  <span class="c1"># 3. 最適化</span>
+</code></pre></div>
+<p>自作の因子は、「誤差 <span class="arithmatex">\(\mathbf{e}\)</span> とヤコビアン (または線形化した <span class="arithmatex">\(\mathbf{H}, \mathbf{b}\)</span>) を返すクラス」を
+作ればグラフに入れられます。著者の <strong>gtsam_points</strong> は、VGICP などのスキャンマッチングのコストを
+GTSAM の因子として実装したライブラリです (<code>IntegratedVGICPFactorGPU</code> など)。
+<a href="09_author_code_guide.html">09 章</a> で詳しく見ます。</p>
+<h2 id="4-isam2-増えていくグラフを効率よく解く">4. iSAM2: 増えていくグラフを効率よく解く</h2>
+<p>ロボットは動き続けるので、グラフには新しい変数と因子が次々に追加されます。
+毎回ゼロから全体を解き直すのは無駄です。</p>
+<p><strong>iSAM2</strong> [Kaess+ IJRR2012] は、</p>
+<ol>
+<li>問題を「ベイズ木 (Bayes tree)」というデータ構造の形で分解したまま保持し、</li>
+<li>新しい因子が来たら、その影響を受ける部分 (たいてい木の上の方の、新しい変数の周り) だけを分解し直し、</li>
+<li>線形化点からのずれが大きくなった変数だけを再線形化する</li>
+</ol>
+<p>ことで、毎回の更新を高速にしています。GLIM の設定にある <code>isam2_relinearize_thresh</code> (再線形化するかどうかの閾値) や
+<code>isam2_relinearize_skip</code> (何回に 1 回再線形化をチェックするか) は、この 3. を調整するパラメータです。</p>
+<blockquote>
+<p>細かいアルゴリズム (ベイズ木の作り方など) は、この論文を理解するうえでは
+「必要なところだけ計算し直してくれる高速なソルバ」という理解で十分です。</p>
+</blockquote>
+<h2 id="5-バッチフィルタスムーザ">5. バッチ・フィルタ・スムーザ</h2>
+<table>
+<thead>
+<tr>
+<th>方式</th>
+<th>何を最適化するか</th>
+<th>長所</th>
+<th>短所</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>バッチ最適化</td>
+<td>最初から今までの全状態</td>
+<td>最も正確</td>
+<td>時間とともに計算量が増える</td>
+</tr>
+<tr>
+<td>フィルタ (カルマンフィルタ等)</td>
+<td>最新の状態だけ (過去はすぐ周辺化)</td>
+<td>軽い</td>
+<td>一度線形化した過去の情報は修正できない</td>
+</tr>
+<tr>
+<td>固定ラグ平滑化 (論文)</td>
+<td>最新の数秒分の状態</td>
+<td>計算量一定で、ウィンドウ内は何度でも再線形化できる</td>
+<td>ウィンドウの外は固定される</td>
+</tr>
+</tbody>
+</table>
+<p>論文の手法は 3 番目です。次の章で詳しく見ます。</p>
+<h2 id="演習-6-前半">演習 6 (前半)</h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex06_factor_graph.py
+</code></pre></div>
+<ul>
+<li>numpy だけでファクターグラフ (姿勢の事前分布・オドメトリ・絶対位置観測) を組み立てて解く</li>
+<li><span class="arithmatex">\(\mathbf{H}\)</span> のスパース性を可視化する</li>
+<li>後半の固定ラグ平滑化は <a href="06_fixed_lag_smoothing.html">06 章</a> で扱う</li>
+</ul>
+<p>GTSAM をインストールできる人は、<code>exercises/optional/opt_gtsam_imu_isam2.py</code> で
+本物の <code>ImuFactor</code> と iSAM2 を試してみてください。</p>
+<h2 id="理解度チェック">理解度チェック</h2>
+<ol>
+<li>変数 <span class="arithmatex">\(\mathbf{x}_3\)</span> と <span class="arithmatex">\(\mathbf{x}_5\)</span> をつなぐ二項因子は、<span class="arithmatex">\(\mathbf{H}\)</span> のどのブロックに値を足す?</li>
+<li>地図マッチング因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathcal{M})\)</span> が単項因子なのはなぜ?</li>
+<li>iSAM2 が毎回全体を解き直すより速いのはなぜ?</li>
+</ol>
+<details>
+<summary>答えの例</summary>
+<ol>
+<li><span class="arithmatex">\((3,3), (3,5), (5,3), (5,5)\)</span> のブロック。</li>
+<li>地図点群 <span class="arithmatex">\(\mathcal{M}\)</span> は既知で固定 (最適化しない) なので、変数は <span class="arithmatex">\(\mathbf{x}_i\)</span> の 1 つだけだから。</li>
+<li>分解の結果 (ベイズ木) を保持しておき、新しい因子の影響を受ける部分だけを計算し直すから。再線形化も必要な変数だけに絞っている。</li>
+</ol>
+</details>
+<h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
+<ul>
+<li>F. Dellaert, M. Kaess, "Factor Graphs for Robot Perception," Foundations and Trends in Robotics, 2017.</li>
+<li>M. Kaess et al., "iSAM2: Incremental Smoothing and Mapping Using the Bayes Tree," IJRR 2012.</li>
+<li>GTSAM 公式: <a href="https://gtsam.org/">https://gtsam.org/</a> (チュートリアルと Python の例が充実)</li>
+</ul>
+<label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="05_factor_graph"> この章を読んだ</label>
+<nav class="pager" aria-label="前後の章"><a class="prev" href="04_imu_and_preintegration.html"><small>前へ</small>04 IMU と事前積分</a><a class="next" href="06_fixed_lag_smoothing.html"><small>次へ</small>06 固定ラグ平滑化と周辺化</a></nav>
+</article>
+</main>
+</div>
+<script src="assets/app.js"></script>
+<script src="assets/demos.js"></script>
+</body>
+</html>

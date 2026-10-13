@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 300" width="760" height="300" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 14px; fill: #1f2733; }
+    .s { font-size: 12px; fill: #586273; }
+    .lbl { font-size: 14px; fill: #1f2733; font-style: italic; }
+    .st { fill: #ffffff; stroke: #1f2733; stroke-width: 1.6; }
+  </style>
+  <rect x="0" y="0" width="760" height="300" fill="#ffffff"/>
+
+  <text x="40" y="30" class="t" font-weight="700">LiDAR フレームの間に届く IMU 計測をひとまとめにする</text>
+
+  <!-- brace -->
+  <path d="M84,78 Q84,66 96,66 L228,66 Q240,66 240,56 Q240,66 252,66 L384,66 Q396,66 396,78" fill="none" stroke="#eb6834" stroke-width="1.6"/>
+  <text x="240" y="48" class="s" text-anchor="middle">ΔR<tspan baseline-shift="sub" font-size="9">ij</tspan>, Δv<tspan baseline-shift="sub" font-size="9">ij</tspan>, Δp<tspan baseline-shift="sub" font-size="9">ij</tspan> に事前積分</text>
+
+  <!-- timeline -->
+  <line x1="40" y1="120" x2="740" y2="120" stroke="#1f2733" stroke-width="1.4"/>
+  <g stroke="#eb6834" stroke-width="1.6">
+    <path d="M112,108 L112,120 M144,108 L144,120 M176,108 L176,120 M208,108 L208,120 M240,108 L240,120 M272,108 L272,120 M304,108 L304,120 M336,108 L336,120 M368,108 L368,120"/>
+    <path d="M432,108 L432,120 M464,108 L464,120 M496,108 L496,120 M528,108 L528,120 M560,108 L560,120 M592,108 L592,120 M624,108 L624,120 M656,108 L656,120 M688,108 L688,120"/>
+  </g>
+  <g stroke="#2a78d6" stroke-width="3">
+    <path d="M80,88 L80,134 M400,88 L400,134 M720,88 L720,134"/>
+  </g>
+  <text x="80" y="152" class="lbl" text-anchor="middle">t<tspan baseline-shift="sub" font-size="10">i</tspan></text>
+  <text x="400" y="152" class="lbl" text-anchor="middle">t<tspan baseline-shift="sub" font-size="10">j</tspan></text>
+  <text x="720" y="152" class="lbl" text-anchor="middle">t<tspan baseline-shift="sub" font-size="10">k</tspan></text>
+  <text x="560" y="98" class="s" text-anchor="middle">IMU (例: 100 Hz)</text>
+  <text x="742" y="100" class="s" text-anchor="end"> </text>
+
+  <!-- states & factors -->
+  <line x1="104" y1="210" x2="376" y2="210" stroke="#9aa3b0" stroke-width="1.5"/>
+  <line x1="424" y1="210" x2="696" y2="210" stroke="#9aa3b0" stroke-width="1.5"/>
+  <rect x="233" y="203" width="14" height="14" fill="#eb6834"/>
+  <rect x="553" y="203" width="14" height="14" fill="#eb6834"/>
+  <circle cx="80" cy="210" r="24" class="st"/><circle cx="400" cy="210" r="24" class="st"/><circle cx="720" cy="210" r="24" class="st"/>
+  <text x="80" y="215" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">i</tspan></text>
+  <text x="400" y="215" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">j</tspan></text>
+  <text x="720" y="215" class="lbl" text-anchor="middle">x<tspan baseline-shift="sub" font-size="10">k</tspan></text>
+  <text x="240" y="242" class="s" text-anchor="middle">IMU 因子 f<tspan baseline-shift="super" font-size="9">I</tspan>(x<tspan baseline-shift="sub" font-size="9">i</tspan>, x<tspan baseline-shift="sub" font-size="9">j</tspan>)</text>
+
+  <text x="40" y="276" class="s">・最適化で x<tspan baseline-shift="sub" font-size="9">i</tspan> (姿勢・速度) が動いても ΔR, Δv, Δp は計算し直さなくてよい</text>
+  <text x="40" y="294" class="s">・バイアス推定値が少し動いたときは、ヤコビアンを掛ける 1 次補正で済ませる</text>
+</svg>
