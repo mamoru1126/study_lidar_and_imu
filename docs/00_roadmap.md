@@ -54,7 +54,7 @@ F(\mathcal{X}) = \sum_{\mathbf{x}_i \in \mathcal{X}} \sum_{j=i-2}^{i-1} f^{P}(\m
 | 章 | 内容 | 演習 | 目安 |
 | --- | --- | --- | --- |
 | [01 座標と回転](01_coordinates_and_rotation.md) | 回転行列、SO(3)/SE(3)、Lie 群、摂動によるヤコビアン | ex01 | 2〜3 時間 |
-| [02 確率と最小二乗](02_probability_and_least_squares.md) | ガウス分布、マハラノビス距離、ガウス・ニュートン法 | ex02 | 2 時間 |
+| [02 確率と最小二乗](02_probability_and_least_squares.md) | 誤差ベクトル、正規分布と共分散行列、最尤推定、ガウス・ニュートン法 | ex02a, ex02b | 3 時間 |
 | [03 スキャンマッチング](03_point_cloud_registration.md) | ICP、NDT、GICP、VGICP、GPU 化 | ex03, ex04 | 3 時間 |
 | [04 IMU と事前積分](04_imu_and_preintegration.md) | IMU の観測モデル、バイアス、ドリフト、事前積分 | ex05 | 3 時間 |
 | [05 ファクターグラフ](05_factor_graph.md) | 因子・変数、スパース性、GTSAM、iSAM2 | ex06 | 2 時間 |

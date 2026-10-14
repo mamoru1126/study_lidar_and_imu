@@ -34,7 +34,7 @@ PAPER_URL = "https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf"
 CHAPTERS = [
     ("00_roadmap", "学習ロードマップ", "論文をひとことで。目的関数の全体像と、必要な知識の地図。", [], "15 分"),
     ("01_coordinates_and_rotation", "座標と回転", "回転行列、SO(3) と SE(3)、Exp と Log、摂動でヤコビアンを求める。", ["math"], "2〜3 時間"),
-    ("02_probability_and_least_squares", "確率と最小二乗", "ガウス分布、マハラノビス距離、ガウス・ニュートン法、局所解と退化。", ["math", "opt"], "2 時間"),
+    ("02_probability_and_least_squares", "確率と最小二乗", "誤差ベクトル、正規分布の −1/2、共分散行列、最尤推定、ガウス・ニュートン法。", ["math", "opt"], "3 時間"),
     ("03_point_cloud_registration", "スキャンマッチング", "ICP から NDT、GICP、VGICP まで。コストそのものを因子にする意味。", ["lidar"], "3 時間"),
     ("04_imu_and_preintegration", "IMU と事前積分", "比力とバイアス、ドリフトの速さ、ΔR・Δv・Δp による事前積分。", ["imu"], "3 時間"),
     ("05_factor_graph", "ファクターグラフ", "変数と因子、H のスパース性、GTSAM の使い方、iSAM2 の考え方。", ["opt"], "2 時間"),

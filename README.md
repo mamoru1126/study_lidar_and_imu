@@ -28,7 +28,7 @@ HTML 版の開き方:
 | --- | --- | --- |
 | [00 学習ロードマップ](docs/00_roadmap.md) | 論文をひとことで。目的関数の全体像 | - |
 | [01 座標と回転](docs/01_coordinates_and_rotation.md) | 回転行列、SO(3)/SE(3)、Exp/Log、摂動によるヤコビアン | ex01 |
-| [02 確率と最小二乗](docs/02_probability_and_least_squares.md) | ガウス分布、マハラノビス距離、ガウス・ニュートン法、局所解 | ex02 |
+| [02 確率と最小二乗](docs/02_probability_and_least_squares.md) | 誤差ベクトル、正規分布と共分散行列、最尤推定、ガウス・ニュートン法 | ex02a, ex02b |
 | [03 スキャンマッチング](docs/03_point_cloud_registration.md) | ICP、NDT、GICP、VGICP、マッチングコスト因子 | ex03, ex04 |
 | [04 IMU と事前積分](docs/04_imu_and_preintegration.md) | 比力、バイアス、ドリフト、ΔR・Δv・Δp | ex05 |
 | [05 ファクターグラフ](docs/05_factor_graph.md) | 因子と変数、スパース性、GTSAM、iSAM2 | ex06 |
@@ -75,7 +75,8 @@ make html        # docs/ から html/ を再生成
 | 演習 | 内容 |
 | --- | --- |
 | `ex01_rotation.py` | 回転行列、Exp/Log、摂動ヤコビアンを数値で確認 |
-| `ex02_least_squares.py` | ガウス・ニュートン法と LM 法。局所解と重み付けの効果 |
+| `ex02a_gaussian.py` | 誤差ベクトル、正規分布の 1/2、共分散行列、マハラノビス距離を数値で確認 |
+| `ex02b_least_squares.py` | ガウス・ニュートン法と LM 法。局所解と重み付けの効果 |
 | `ex03_icp_2d.py` | 点対点 ICP・点対線 ICP・GICP の比較 |
 | `ex04_vgicp_2d.py` | ガウス分布ボクセル地図と VGICP、マルチ解像度 |
 | `ex05_imu.py` | IMU のドリフト、事前積分、バイアスの 1 次補正 |

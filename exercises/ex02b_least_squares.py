@@ -1,6 +1,6 @@
-"""演習 2: 非線形最小二乗 (ガウス・ニュートン法 / レーベンバーグ・マーカート法)
+"""演習 2b: 非線形最小二乗 (ガウス・ニュートン法 / レーベンバーグ・マーカート法)
 
-対応する資料: docs/02_probability_and_least_squares.md
+対応する資料: docs/02_probability_and_least_squares.md (6 節以降)
 
 問題設定
   2D 平面上のロボットが、位置の分かっている 4 つのランドマークまでの距離を測った。
@@ -17,7 +17,7 @@
   3. 精度の違うセンサは重み Ω (= 共分散の逆行列) で正しく扱う
   4. 解の不確かさ (共分散) は H^{-1} で近似できる
 
-実行: python exercises/ex02_least_squares.py
+実行: python exercises/ex02b_least_squares.py
 """
 
 import numpy as np

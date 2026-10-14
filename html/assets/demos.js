@@ -635,8 +635,125 @@
     start();
   }
 
+  // ------------------------------------------------------------------ 6. 共分散行列と楕円
+  function demoCov(root) {
+    var body = shell(root, "共分散行列と楕円", "スライダーでばらつきを変えてみよう。図をタップすると誤差ベクトル e を置ける。壁に沿う向きと垂直な向きに同じ長さだけ置いて、マハラノビス距離を比べてみよう");
+    var canvas = el("canvas", { "aria-label": "2 次元の正規分布の楕円" });
+    body.appendChild(canvas);
+    var controls = el("div", { class: "controls" });
+    function slider(label, id, min, max, step, val, fmt) {
+      var lab = el("label", { class: "slider-row" }, "<span>" + label + "</span>");
+      var s = el("input", { type: "range", id: id, min: min, max: max, step: step, value: val });
+      var out = el("b", { style: "font-family:var(--font-mono);font-weight:500;font-size:13px" });
+      lab.appendChild(s); lab.appendChild(out);
+      controls.appendChild(lab);
+      function upd() { out.textContent = fmt(parseFloat(s.value)); }
+      upd();
+      s.addEventListener("input", function () { upd(); draw(); });
+      return s;
+    }
+    var sA = slider("沿う方向の σ", "cov-along", "0.05", "0.6", "0.01", "0.40", function (v) { return v.toFixed(2) + " m"; });
+    var sC = slider("垂直方向の σ", "cov-across", "0.02", "0.6", "0.01", "0.05", function (v) { return v.toFixed(2) + " m"; });
+    var sT = slider("壁の傾き", "cov-angle", "-90", "90", "1", "30", function (v) { return v.toFixed(0) + "°"; });
+    body.appendChild(controls);
+    var mats = el("div", { class: "readout", style: "align-items:flex-start" });
+    body.appendChild(mats);
+    var readout = el("div", { class: "readout" });
+    body.appendChild(readout);
+    body.appendChild(el("div", { class: "legend" },
+      '<span><i class="dot" style="--c:var(--muted)"></i>この分布から取ったサンプル</span>' +
+      '<span><i style="--c:var(--lidar)"></i>マハラノビス距離 1, 2, 3 の楕円</span>' +
+      '<span><i style="--c:var(--imu)"></i>誤差ベクトル e (タップで移動)</span>'));
+
+    var g = gaussFactory(mulberry32(5));
+    var base = [];
+    for (var i = 0; i < 400; i++) base.push([g(), g()]);
+    var e = [0.26, 0.15]; // 壁 (30°) に沿って 0.3 m
+    var B = [-1.2, 1.2, -0.9, 0.9];
+
+    function params() {
+      var a = parseFloat(sA.value), c = parseFloat(sC.value), th = parseFloat(sT.value) * Math.PI / 180;
+      var co = Math.cos(th), si = Math.sin(th);
+      // Σ = R diag(a², c²) R^T
+      var sxx = co * co * a * a + si * si * c * c;
+      var syy = si * si * a * a + co * co * c * c;
+      var sxy = co * si * (a * a - c * c);
+      var det = sxx * syy - sxy * sxy;
+      return { a: a, c: c, co: co, si: si, S: [sxx, sxy, syy], I: [syy / det, -sxy / det, sxx / det] };
+    }
+    function fmt(v) { var t = v.toFixed(4); return (v >= 0 ? "&nbsp;" : "") + t; }
+    function matHTML(name, m) {
+      return '<span style="display:inline-grid;grid-template-columns:auto auto;gap:0 10px;align-items:center">' +
+        '<span>' + name + ' =</span><span style="font-family:var(--font-mono);color:var(--ink);line-height:1.5;border-left:1.5px solid var(--muted);border-right:1.5px solid var(--muted);padding:0 6px">' +
+        fmt(m[0]) + "&nbsp;&nbsp;" + fmt(m[1]) + "<br>" + fmt(m[1]) + "&nbsp;&nbsp;" + fmt(m[2]) + "</span></span>";
+    }
+    function draw() {
+      var P = params();
+      var f = fitCanvas(canvas, 0.75), ctx = f.ctx;
+      var V = view(B, f.w, f.h, 6);
+      ctx.clearRect(0, 0, f.w, f.h);
+      // 軸
+      ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(V.x(B[0]), V.y(0)); ctx.lineTo(V.x(B[1]), V.y(0));
+      ctx.moveTo(V.x(0), V.y(B[2])); ctx.lineTo(V.x(0), V.y(B[3])); ctx.stroke();
+      ctx.fillStyle = css("--muted"); ctx.font = "12px " + css("--font-mono");
+      ctx.fillText("x", V.x(B[1]) - 12, V.y(0) - 6); ctx.fillText("y", V.x(0) + 6, V.y(B[3]) + 14);
+      // 壁
+      ctx.strokeStyle = css("--ink"); ctx.globalAlpha = 0.15; ctx.lineWidth = 6;
+      ctx.beginPath(); ctx.moveTo(V.x(-2 * P.co), V.y(-2 * P.si)); ctx.lineTo(V.x(2 * P.co), V.y(2 * P.si)); ctx.stroke();
+      ctx.globalAlpha = 1;
+      // サンプル: (u, v) = (a·g1, c·g2) を回転
+      ctx.fillStyle = css("--muted");
+      base.forEach(function (q) {
+        var u = P.a * q[0], v = P.c * q[1];
+        var x = P.co * u - P.si * v, y = P.si * u + P.co * v;
+        ctx.fillRect(V.x(x) - 1.2, V.y(y) - 1.2, 2.4, 2.4);
+      });
+      // 楕円
+      ctx.strokeStyle = css("--lidar");
+      [1, 2, 3].forEach(function (k) {
+        ctx.lineWidth = k === 1 ? 2 : 1.1;
+        ctx.beginPath();
+        for (var j = 0; j <= 72; j++) {
+          var t = j / 72 * 2 * Math.PI, u = k * P.a * Math.cos(t), v = k * P.c * Math.sin(t);
+          var x = P.co * u - P.si * v, y = P.si * u + P.co * v;
+          (j ? ctx.lineTo : ctx.moveTo).call(ctx, V.x(x), V.y(y));
+        }
+        ctx.stroke();
+      });
+      // 誤差ベクトル
+      ctx.strokeStyle = css("--imu"); ctx.fillStyle = css("--imu"); ctx.lineWidth = 2.2;
+      ctx.beginPath(); ctx.moveTo(V.x(0), V.y(0)); ctx.lineTo(V.x(e[0]), V.y(e[1])); ctx.stroke();
+      ctx.beginPath(); ctx.arc(V.x(e[0]), V.y(e[1]), 6, 0, 7); ctx.fill();
+      ctx.fillText("e", V.x(e[0]) + 9, V.y(e[1]) - 8);
+
+      var I = P.I;
+      var d2 = I[0] * e[0] * e[0] + 2 * I[1] * e[0] * e[1] + I[2] * e[1] * e[1];
+      var rho = P.S[1] / Math.sqrt(P.S[0] * P.S[2]);
+      mats.innerHTML = matHTML("Σ", P.S) + matHTML("Σ⁻¹", I) + "<span>相関係数 ρ = <b>" + rho.toFixed(2) + "</b></span>";
+      var dens = Math.exp(-0.5 * d2);
+      readout.innerHTML = "<span>e = (<b>" + e[0].toFixed(2) + "</b>, <b>" + e[1].toFixed(2) + "</b>)</span>" +
+        "<span>長さ |e| = <b>" + Math.hypot(e[0], e[1]).toFixed(3) + " m</b></span>" +
+        "<span>マハラノビス距離 √(eᵀΣ⁻¹e) = <b>" + Math.sqrt(d2).toFixed(2) + "</b> (σ 何個分)</span>" +
+        "<span>確率密度は頂上の <b>" + (dens > 1e-3 ? dens.toFixed(3) : dens.toExponential(1)) + "</b> 倍</span>";
+    }
+    function pick(ev) {
+      var r = canvas.getBoundingClientRect();
+      var V = view(B, r.width, r.height, 6);
+      var px = ev.clientX - r.left, py = ev.clientY - r.top;
+      e = [(px - V.x(0)) / V.s, -(py - V.y(0)) / V.s];
+      draw();
+    }
+    canvas.addEventListener("pointerdown", function (ev) { pick(ev); canvas.setPointerCapture && canvas.setPointerCapture(ev.pointerId); });
+    canvas.addEventListener("pointermove", function (ev) { if (ev.buttons) pick(ev); });
+    canvas.style.cursor = "crosshair";
+    onResize(canvas, draw);
+    onTheme(draw);
+    draw();
+  }
+
   // ------------------------------------------------------------------ 起動
-  var map = { icp: demoICP, imu: demoIMU, equation: demoEquation, replay: demoReplay };
+  var map = { icp: demoICP, imu: demoIMU, equation: demoEquation, replay: demoReplay, cov: demoCov };
   document.querySelectorAll("[data-demo]").forEach(function (node) {
     var f = map[node.getAttribute("data-demo")];
     if (f) {

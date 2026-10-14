@@ -11,7 +11,8 @@ check:
 
 exercises:
 	$(PY) exercises/ex01_rotation.py
-	$(PY) exercises/ex02_least_squares.py
+	$(PY) exercises/ex02a_gaussian.py
+	$(PY) exercises/ex02b_least_squares.py
 	$(PY) exercises/ex03_icp_2d.py
 	$(PY) exercises/ex04_vgicp_2d.py
 	$(PY) exercises/ex05_imu.py
