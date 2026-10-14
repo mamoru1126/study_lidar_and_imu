@@ -13,13 +13,12 @@
 | 形式 | 場所 | 特徴 |
 | --- | --- | --- |
 | Markdown | [`docs/`](docs/00_roadmap.md) | GitHub 上でそのまま読める (数式も表示される) |
-| HTML | [`html/index.html`](html/index.html) | 目次・読了チェック付き。**ICP・IMU ドリフト・式と因子の対応・再現実験の再生** を動かせるインタラクティブデモ入り |
+| HTML | [Web 版](https://mamoru1126.github.io/study_lidar_and_imu/html/) / [`html/index.html`](html/index.html) | 目次・読了チェック付き。**ICP・IMU ドリフト・式と因子の対応・再現実験の再生** を動かせるインタラクティブデモ入り |
 
 HTML 版の開き方:
 
+- **Web で読む**: <https://mamoru1126.github.io/study_lidar_and_imu/html/>
 - **ローカル**: クローンして `html/index.html` をブラウザで開くだけ (数式表示用の KaTeX を同梱しているのでオフラインでも読めます)
-- **GitHub Pages**: リポジトリの Settings → Pages → Source を「Deploy from a branch」、Branch を `master` / `/ (root)` にすると、
-  `https://mamoru1126.github.io/study_lidar_and_imu/html/` で公開されます
 
 ## 学習ロードマップ
 
