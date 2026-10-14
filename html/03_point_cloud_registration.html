@@ -30,6 +30,7 @@
 <li>点対点 ICP・点対面 ICP・NDT・GICP・VGICP を、それぞれ図で説明できる</li>
 <li><strong>NDT と GICP の違い</strong> を、「地図の表し方」「ソース側の扱い」「対応の探し方」「コストの形」の 4 点で説明できる</li>
 <li>VGICP が「NDT の速さ」と「GICP の精度」をどう両立しているかが分かる</li>
+<li>発展として、F3-SLAM の「解像度と特徴を点ごとに選ぶ」スキャンマッチングが分かる</li>
 <li>論文が「位置合わせの結果」ではなく「位置合わせのコストそのもの」を因子にしている意味が分かる</li>
 </ul>
 <blockquote>
@@ -329,7 +330,190 @@ GLIM では 0.25〜0.5 m 程度を基本にしています。</p>
 <p><img alt="VGICP とマルチ解像度 (演習 4)" src="figures/ex04_vgicp_2d.png" /></p>
 <p>さらに論文の手法では、<strong>IMU で予測した姿勢</strong> を初期値にするので、もともと正解に近い所から始められます (<a href="04_imu_and_preintegration.html">04 章</a>)。</p>
 <hr />
-<h2 id="9-手法を動かして比べる">9. 手法を動かして比べる</h2>
+<h2 id="9-発展-f3-slam-のスキャンマッチング-解像度と特徴を点ごとに選ぶ">9. 発展: F3-SLAM のスキャンマッチング (解像度と特徴を点ごとに選ぶ)</h2>
+<p>ここでは、VGICP とは別の方法で「ボクセルの速さ」と「特徴を使ったマッチングの精度」の両立を目指した手法として、
+次の論文のスキャンマッチングを紹介します。</p>
+<blockquote>
+<p>劉 陽, 山本 和成, 松井 敦史, 高橋 三郎, 阿部 敏久,
+「F3-SLAM：柔軟なセンサ構成に対応した高速かつ高精度な SLAM」,
+計測自動制御学会論文集, Vol.60, No.12, pp.631–637, 2024. (パナソニック アドバンストテクノロジー)</p>
+</blockquote>
+<p>F3-SLAM の貢献は 2 つあります。1 つは、IMU・車輪オドメトリの有無に合わせて自動で密結合の形を変えるフィルタ (Flexible-ESEKF)。
+もう 1 つが、ここで扱う <strong>複数解像度ボクセル地図を使った高速・高精度なスキャンマッチング</strong> です。</p>
+<h3 id="91-論文の問題意識-近傍探索とボクセル探索">9.1 論文の問題意識: 近傍探索とボクセル探索</h3>
+<p>論文は、スキャンマッチングで対応を探す方法を 2 つに分けています。</p>
+<ul>
+<li><strong>近傍探索</strong> (FAST-LIO の kd-tree など): 近くの点に面などの特徴を当てはめて、点対面 ICP などで合わせる。ただし、スキャンの全点で近傍探索と当てはめをすると負担が大きい</li>
+<li><strong>ボクセル探索</strong> (NDT など): ボクセルを引くだけなので速く、分布で表すのでノイズや外れ値にも強い。ただしボクセルの大きさが 1 つに決まっているので、1 つのボクセルに別の物体が入ると精度が落ちる</li>
+</ul>
+<p>これは 7 節で見た NDT と GICP の違いそのものです。F3-SLAM は「複数の大きさのボクセル地図を作り、点ごとに <strong>解像度と特徴 (平面かどうか)</strong> を見てボクセルを選ぶ」ことで両方の良さを取ろうとしています。</p>
+<h3 id="92-ndt-のボクセルの大きさのジレンマ-論文-fig-2">9.2 NDT のボクセルの大きさのジレンマ (論文 Fig. 2)</h3>
+<p>論文の Fig. 2 は、直角の壁 2 枚と円柱 2 本の環境で、NDT のボクセルの大きさを変えたときの様子を示しています。
+演習 3c で同じ状況を 2D で再現したのが次の図です。</p>
+<p><img alt="NDT のボクセルの大きさのジレンマ (演習 3c、論文 Fig. 2 の再現)" src="figures/ex03c_1_ndt_voxel_size.png" /></p>
+<ul>
+<li><strong>大きいボクセル (2 m)</strong>: 壁の角のように 2 つの面が入るボクセルでは、分布が大きくふくらみ、実物の形からずれる</li>
+<li><strong>小さいボクセル (1 m)</strong>: 角のふくらみは小さくなるが、1 つのボクセルに入る点が減り、外れ値の影響を受けやすくなる</li>
+</ul>
+<p>まっすぐな壁は大きいボクセルの方が多くの点で安定した分布になり、角や細かい物は小さいボクセルでないと形が崩れます。
+つまり <strong>場所によって最適なボクセルの大きさが違う</strong> のです。</p>
+<h3 id="93-ピラミッド型の複数解像度ボクセル地図">9.3 ピラミッド型の複数解像度ボクセル地図</h3>
+<p>F3-SLAM の地図は、大きさの違うボクセルを層状に重ねたものです。</p>
+<ul>
+<li>下の層のボクセルの大きさは、上の層の <strong>1/2</strong></li>
+<li>各ボクセルは、点の数 <span class="arithmatex">\(n\)</span>、平均 <span class="arithmatex">\(\boldsymbol{\mu}\)</span>、共分散 <span class="arithmatex">\(\boldsymbol{\Sigma}\)</span> と、自分を含む上の層のボクセル (親) へのポインタを持つ</li>
+<li>各層のボクセルはハッシュ表で管理して、座標からすぐに引けるようにする</li>
+</ul>
+<p><strong>地図の更新</strong>: 新しい点は一番下の層のボクセルにだけ入れて、<span class="arithmatex">\(n, \boldsymbol{\mu}, \boldsymbol{\Sigma}\)</span> を更新します。
+親ボクセルは、点を見直さずに <strong>子ボクセルの統計量だけから</strong> 計算します (論文の (14) 式)。</p>
+<div class="arithmatex">\[
+\begin{aligned}
+n &= \sum_i n_i \\
+\boldsymbol{\mu} &= \frac{1}{n}\sum_i n_i \boldsymbol{\mu}_i \\
+\boldsymbol{\Sigma} &= -\boldsymbol{\mu}\boldsymbol{\mu}^\top + \frac{1}{n}\sum_i n_i\left(\boldsymbol{\Sigma}_i + \boldsymbol{\mu}_i\boldsymbol{\mu}_i^\top\right)
+\end{aligned}
+\]</div>
+<p><span class="arithmatex">\(i\)</span> は子ボクセルの番号です。3 行目は「共分散 = 2 乗の平均 − 平均の 2 乗」という関係から来ています。
+子ボクセル <span class="arithmatex">\(i\)</span> の点の <span class="arithmatex">\(\mathbf{q}\mathbf{q}^\top\)</span> の平均は <span class="arithmatex">\(\boldsymbol{\Sigma}_i + \boldsymbol{\mu}_i\boldsymbol{\mu}_i^\top\)</span> なので、
+それを点の数で重み付けして平均すれば親の「2 乗の平均」になり、そこから <span class="arithmatex">\(\boldsymbol{\mu}\boldsymbol{\mu}^\top\)</span> を引けば親の共分散です。
+演習 3c で、この式で作った親の値が点から直接計算した値と一致する (差 <span class="arithmatex">\(10^{-14}\)</span> 程度) ことを確かめます。</p>
+<p>変化した子ボクセルの親だけを更新すればよいので、複数の解像度を持っていても地図の更新が速くなります。
+論文では、FAST-LIO2 の地図 (ikd-tree) の更新より、組み込みボード上で約 1.6 倍速いと報告されています。</p>
+<p><strong>特徴の判定</strong>: 更新したボクセルの共分散を固有値分解し、固有値を小さい順に <span class="arithmatex">\(\lambda_0 \le \lambda_1 \le \lambda_2\)</span> とします。</p>
+<ul>
+<li><span class="arithmatex">\(\lambda_0 / \lambda_1 &lt; \theta\)</span> なら <strong>平面</strong>。法線 <span class="arithmatex">\(\mathbf{n}\)</span> は <span class="arithmatex">\(\lambda_0\)</span> の固有ベクトル (<a href="#23-点ごとの共分散と法線">2.3 節</a>と同じ考え方)</li>
+<li>そうでなければ <strong>非平面</strong> (角、円柱、木など)</li>
+</ul>
+<h3 id="94-ボクセルの選び方-論文-fig-3">9.4 ボクセルの選び方 (論文 Fig. 3)</h3>
+<p>スキャンマッチングでは、入力点 1 つごとに、複数の層から <strong>ボクセルを 1 つだけ</strong> 選びます。論文の方針は「<strong>できるだけ平面で、できるだけ大きいボクセル</strong>」です。</p>
+<ol>
+<li>入力点を含むボクセルを、<strong>大きい層から順に</strong> 調べる</li>
+<li>「ボクセル内の点の数が最小値以上」かつ「入力点とボクセルの距離が最大値以下」なら候補にする</li>
+<li>候補が <strong>平面</strong> なら、そこで探索を終えてそのボクセルを選ぶ</li>
+<li><strong>非平面</strong> なら、1 つ小さい層のボクセルで同じことを繰り返す</li>
+</ol>
+<p><img alt="入力点ごとに選ばれたボクセル (演習 3c、論文 Fig. 3 の再現)" src="figures/ex03c_2_voxel_selection.png" /></p>
+<p>左の図は、演習 3c で入力スキャンの各点が選んだボクセルです。</p>
+<ul>
+<li><strong>まっすぐな壁</strong>: 一番大きい 2 m のボクセルが平面と判定され、そのまま選ばれる。点が多いので外れ値に強い</li>
+<li><strong>壁の角の近く</strong>: 2 m のボクセルは 2 枚の壁が入って非平面になるので、1 m、0.5 m と小さいボクセルに下りて、壁を線として表せる大きさで止まる</li>
+<li><strong>円柱</strong>: どの大きさでも平面にならないので、小さいボクセルの非平面の分布が使われる</li>
+</ul>
+<p>論文の Fig. 3 も、この 3 つの場合 (角 → 小さい平面ボクセル、壁 → 大きい平面ボクセル、円柱 → 適切な大きさの非平面ボクセル) を示しています。</p>
+<div data-demo="voxel" data-mode="f3"></div>
+
+<h3 id="95-2-種類の誤差の測り方">9.5 2 種類の誤差の測り方</h3>
+<p>選んだボクセルの種類によって、誤差 (観測モデル) を切り替えます。<span class="arithmatex">\(\mathbf{p}_j\)</span> は入力点 (ロボットの座標系)、<span class="arithmatex">\(\mathbf{R}, \mathbf{t}\)</span> は推定する姿勢です。</p>
+<p><strong>平面ボクセル</strong>: 点対面 ICP と同じ形です (論文の (17) 式)。面は近傍探索ではなく、ボクセルの平均 <span class="arithmatex">\(\boldsymbol{\mu}\)</span> と法線 <span class="arithmatex">\(\mathbf{n}\)</span> で決まります。</p>
+<div class="arithmatex">\[
+z^{j}_{\text{plane}} = (\mathbf{R}\mathbf{p}_j + \mathbf{t} - \boldsymbol{\mu}) \cdot \mathbf{n}
+\]</div>
+<p><strong>非平面ボクセル</strong>: NDT と同じく点対分布ですが、スコアではなく <strong>白色化した残差</strong> (<a href="02_probability_and_least_squares.html">02 章</a> 4.3 節) にして、最小二乗で扱います (論文の (15) 式)。</p>
+<div class="arithmatex">\[
+\mathbf{z}^{j}_{\text{nonplane}} = \boldsymbol{\Sigma}_j^{-\frac{1}{2}}\left(\mathbf{R}\mathbf{p}_j + \mathbf{t} - \boldsymbol{\mu}_j\right)
+\]</div>
+<p>これらを姿勢で微分したヤコビアン (論文の (16)(18) 式) は、<a href="01_coordinates_and_rotation.html">01 章</a> の右摂動の結果
+<span class="arithmatex">\(\partial(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})/\partial\boldsymbol{\delta} = -\mathbf{R}[\mathbf{p}]_\times\)</span> を使うと出てきます。
+例えば平面の場合、並進で微分すると <span class="arithmatex">\(\mathbf{n}^\top\)</span>、回転で微分すると <span class="arithmatex">\(-\mathbf{n}^\top\mathbf{R}[\mathbf{p}_j]_\times\)</span> です
+(論文ではこれを転置した <span class="arithmatex">\([\mathbf{p}_j]_\times\mathbf{R}^\top\mathbf{n}\)</span> の形で書いています)。速度やバイアスの列は 0 です。</p>
+<h3 id="96-フィルタの中で最小二乗として解く">9.6 フィルタの中で最小二乗として解く</h3>
+<p>F3-SLAM は、IMU や車輪オドメトリで状態を予測し、LiDAR で修正するカルマンフィルタ (誤差状態 EKF) の形をとっています。
+修正のステップでは、「予測からのずれ」と「すべての入力点の残差」の和を最小にします (論文の (12) 式)。</p>
+<div class="arithmatex">\[
+\arg\min_{\tilde{\mathbf{x}}} \left( \lVert\tilde{\mathbf{x}}\rVert^2_{\mathbf{P}^{-1}} + \sum_j \lVert \mathbf{z}_j + \mathbf{H}_j\tilde{\mathbf{x}} \rVert^2_{\mathbf{Q}_s^{-1}} \right)
+\]</div>
+<p>1 項目は「予測 (共分散 <span class="arithmatex">\(\mathbf{P}\)</span>) からあまり離れたくない」という事前分布、2 項目は LiDAR の点ごとの残差で、
+<a href="02_probability_and_least_squares.html">02 章</a> 5.2 節の「事前分布 + 観測の重み付き最小二乗」そのものです。これをガウス・ニュートン法で解きます。</p>
+<p>修正後の共分散は、情報行列の和の逆行列として計算します (論文の (13) 式)。</p>
+<div class="arithmatex">\[
+\bar{\mathbf{P}}_{k+1} = \left(\mathbf{P}_{k+1}^{-1} + \sum_j \mathbf{H}_j^\top\mathbf{Q}_s^{-1}\mathbf{H}_j\right)^{-1}
+\]</div>
+<p><a href="02_probability_and_least_squares.html">02 章</a> 8 節の「推定の共分散 ≈ <span class="arithmatex">\(\mathbf{H}^{-1}\)</span>」と同じ考え方です。
+論文によると、FAST-LIO の計算式と結果は同じ (付録で証明) ですが、点の数に比例する大きさのカルマンゲインを作らずに済むので速くなります。</p>
+<h3 id="97-ndtgicpvgicp-との比較">9.7 NDT・GICP・VGICP との比較</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>NDT</th>
+<th>GICP</th>
+<th>VGICP</th>
+<th>F3-SLAM</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>地図</td>
+<td>ボクセルの分布 (大きさは 1 つ)</td>
+<td>点ごとの分布</td>
+<td>ボクセルの分布 (GLIM では複数の大きさ)</td>
+<td>大きさが半分ずつのボクセルの層 + 平面かどうか</td>
+</tr>
+<tr>
+<td>ソース側</td>
+<td>点</td>
+<td>分布</td>
+<td>分布</td>
+<td>点</td>
+</tr>
+<tr>
+<td>対応の探し方</td>
+<td>ボクセルを引く</td>
+<td>kd-tree</td>
+<td>ボクセルを引く (全部の層)</td>
+<td>ボクセルを引く (点ごとに 1 つの層)</td>
+</tr>
+<tr>
+<td>誤差</td>
+<td>スコア (exp)</td>
+<td>分布対分布</td>
+<td>分布対分布</td>
+<td>点対面 か 点対分布</td>
+</tr>
+<tr>
+<td>解き方</td>
+<td>ニュートン法</td>
+<td>ガウス・ニュートン法</td>
+<td>ガウス・ニュートン法 (論文では固定ラグ平滑化の因子)</td>
+<td>誤差状態カルマンフィルタの中でガウス・ニュートン法</td>
+</tr>
+<tr>
+<td>計算機</td>
+<td>CPU</td>
+<td>CPU</td>
+<td>GPU (CPU 版もある)</td>
+<td>CPU 1 スレッド (組み込みボードでも動く)</td>
+</tr>
+</tbody>
+</table>
+<p>VGICP のマルチ解像度 (8.4 節) は <strong>全部の層のコストを足す</strong> のに対し、F3-SLAM は <strong>点ごとに 1 つの層を選ぶ</strong> 点が大きな違いです。
+また、多層の NDT (ML-NDT) と比べると、ボクセルが平面かどうかも判定して誤差の形を切り替える点が新しいところです。</p>
+<h3 id="98-結果をどう読むか">9.8 結果をどう読むか</h3>
+<p><strong>論文の実験</strong> (FAST-LIO2 との比較):</p>
+<ul>
+<li>処理時間 (Newer College、1 スキャン約 6,000 点): デスクトップ PC (Intel i7-8700) では処理時間の差は小さく、CPU 使用率は FAST-LIO2 の 107% に対して 50%。
+  組み込みボード (Jetson Nano) では、状態推定の時間が 176 ms に対して 27 ms (論文では約 6 倍速いと記載)、地図の更新が 18 ms に対して 11 ms</li>
+<li>精度 (軌跡の誤差 ATE): HILTI、Newer College では FAST-LIO2 と同程度かそれ以上。雪の BOREAS やトンネルでは大きく上回る</li>
+<li>ただし BOREAS とトンネルは車輪オドメトリも使えるデータで、F3-SLAM はそれも密結合に使えます (FAST-LIO2 は使えない)。
+  論文でもトンネルでの差は車輪オドメトリを活用できることによると説明しているので、差のすべてがスキャンマッチングによるものではありません</li>
+</ul>
+<p><strong>演習 3c の 2D 再現</strong> (右の棒グラフ):</p>
+<ul>
+<li>初期値のずれが大きい (1 m・10°) とき、0.5 m だけの NDT 型は成功率 77% に下がるのに対し、F3-SLAM 型の選択は 100% を保つ。
+  事前に「どの大きさが良いか」を決めなくても、良い大きさ (この例では 1 m) と同じくらい頑健になる</li>
+<li>誤差は 1〜2 cm で、どの方法もこの例の測定ノイズ (2 cm) と同じ程度。この簡単な 2D の例では、精度の優劣までは言えない</li>
+<li>速さ (論文の主な主張の 1 つ) は、Python の 2D の例では意味のある比較ができないので扱っていない</li>
+</ul>
+<p>演習 3c の平面判定のしきい値 <span class="arithmatex">\(\theta\)</span>、ボクセルの最少点数、点とボクセルの最大距離は、論文に値が書かれていないので、この教材で決めた値です。</p>
+<h3 id="99-この教材の論文との関係">9.9 この教材の論文との関係</h3>
+<p>この教材で読んでいる小出らの論文と F3-SLAM は、どちらも「ボクセルで速く、特徴 (面や分布の形) で正確に」という同じ方向を向いていますが、手段が違います。</p>
+<ul>
+<li><strong>小出らの論文</strong>: VGICP の分布対分布マッチングを、複数フレーム・地図と同時に因子グラフの固定ラグ平滑化で解く。GPU で大量の点を並列に計算する</li>
+<li><strong>F3-SLAM</strong>: 点ごとに 1 つのボクセルを選んで点対面・点対分布を切り替え、カルマンフィルタの中で解く。CPU 1 スレッドで、組み込みボードでも動かす</li>
+</ul>
+<p>フィルタとウィンドウ最適化の違いは <a href="06_fixed_lag_smoothing.html">06 章</a> で扱います。</p>
+<hr />
+<h2 id="10-手法を動かして比べる">10. 手法を動かして比べる</h2>
 <p>演習 3b では、点対点 ICP・点対面 ICP・GICP を実際に反復させて、収束の速さと初期値への強さを比べます。</p>
 <p><img alt="ICP 系の手法の比較 (演習 3b)" src="figures/ex03_icp_2d.png" /></p>
 <ul>
@@ -339,7 +523,7 @@ GLIM では 0.25〜0.5 m 程度を基本にしています。</p>
 <div data-demo="icp"></div>
 
 <hr />
-<h2 id="10-位置合わせの結果ではなくコストを因子にする">10. 位置合わせの「結果」ではなく「コスト」を因子にする</h2>
+<h2 id="11-位置合わせの結果ではなくコストを因子にする">11. 位置合わせの「結果」ではなく「コスト」を因子にする</h2>
 <p>ここが論文 (と著者の一連の研究) を理解するうえで重要な点です。</p>
 <p><strong>よくある方法 (疎結合・ポーズグラフ)</strong>:
 ICP などで 2 フレーム間の相対姿勢を求め、その結果 (と、だいたいの共分散) を「相対姿勢の観測」としてグラフに入れます。</p>
@@ -363,7 +547,7 @@ VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j
 \]</div>
 <p>(<span class="arithmatex">\(\mathbf{A}_k\)</span>, <span class="arithmatex">\(\mathbf{B}_k\)</span> は 2 つの姿勢に対する誤差のヤコビアン、<span class="arithmatex">\(\boldsymbol{\Omega}_k\)</span> は 8.1 節の重み (共分散の和の逆行列)。転置の位置は論文によって書き方が異なります)
 演習 7 の <code>ScanFactor.linearize</code> が、これを numpy で書いたものです。</p>
-<h2 id="11-gpu-のちょっとした話">11. GPU のちょっとした話</h2>
+<h2 id="12-gpu-のちょっとした話">12. GPU のちょっとした話</h2>
 <p>GLIM の論文によれば、多数の VGICP 因子を線形化するとき、</p>
 <ul>
 <li>線形化点 (各姿勢の推定値) をまとめて 1 回で GPU に送り、</li>
@@ -373,9 +557,10 @@ VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j
 <p>ことで、因子の数によらず CPU⇔GPU の転送を 2 回に抑えています。
 「計算そのもの」より「転送や同期」がボトルネックになりやすいのが GPU プログラミングの勘所です。</p>
 <hr />
-<h2 id="演習-3a-3b-4">演習 3a, 3b, 4</h2>
+<h2 id="演習-3a-3b-3c-4">演習 3a, 3b, 3c, 4</h2>
 <div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex03a_matching_methods.py<span class="w">   </span><span class="c1"># この章の図: 前処理・ICP・NDT・GICP・VGICP・コストの形</span>
 python<span class="w"> </span>exercises/ex03b_icp_2d.py<span class="w">             </span><span class="c1"># 点対点 ICP・点対面 ICP・GICP を反復させて比較</span>
+python<span class="w"> </span>exercises/ex03c_f3slam_multires.py<span class="w">    </span><span class="c1"># F3-SLAM: ピラミッド型ボクセル、(14) 式、ボクセルの選択、位置合わせ</span>
 python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">            </span><span class="c1"># VGICP のボクセル地図、対応探索の速さ、マルチ解像度</span>
 </code></pre></div>
 <h2 id="理解度チェック">理解度チェック</h2>
@@ -388,6 +573,8 @@ python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">        
 <li>NDT の谷が狭くなりやすいのはなぜ? どんな対策がある?</li>
 <li>VGICP は NDT と GICP のどこを受け継いでいる?</li>
 <li>「位置合わせの結果を因子にする」のと「位置合わせのコストを因子にする」のでは何が違う?</li>
+<li>F3-SLAM は入力点ごとにどのようにボクセルを選ぶ? 選んだボクセルによって誤差の形をどう変える?</li>
+<li>F3-SLAM の (14) 式で、親ボクセルの共分散を子ボクセルの統計量だけから計算できるのはなぜ?</li>
 </ol>
 <details>
 <summary>答えの例</summary>
@@ -400,6 +587,8 @@ python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">        
 <li>入ったボクセルの分布しか見ず、1 点あたりのスコアに上限があるので、正解から離れると手がかりがなくなるから。隣のボクセルも見る、粗いボクセルから段階的に合わせる、格子をずらして重ねる、良い初期値 (IMU など) を使う、などで対策する。</li>
 <li>NDT から: ボクセルで地図を区切り、対応を表引きで決める (速い、GPU 向き)。GICP から: 点ごとの共分散 (ボクセルの分布はその平均)、ソース側も分布、最小二乗のコスト。</li>
 <li>結果を因子にすると、相対姿勢の正規分布という要約で情報が失われる。コストを因子にすると、点ごとの誤差を最適化のたびに線形化し直すので、退化方向の扱いや複数フレームとの同時マッチングが自然にできる。</li>
+<li>入力点を含むボクセルを大きい層から順に調べ、点の数と距離の条件を満たす候補が平面ならそこで決める。非平面なら 1 つ小さい層へ進む。平面ボクセルでは点対面 (法線方向の距離)、非平面ボクセルでは点対分布 (白色化したマハラノビス距離) の残差を使う。</li>
+<li>共分散は「2 乗の平均 − 平均の 2 乗」で、子ボクセルの「2 乗の平均」は <span class="arithmatex">\(\boldsymbol{\Sigma}_i + \boldsymbol{\mu}_i\boldsymbol{\mu}_i^\top\)</span> と子の統計量だけで書けるから。点の数で重み付けして足せば親の「2 乗の平均」になる。</li>
 </ol>
 </details>
 <h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
@@ -410,6 +599,8 @@ python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">        
 <li>A. Segal, D. Haehnel, S. Thrun, "Generalized-ICP," RSS 2009.</li>
 <li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Voxelized GICP for Fast and Accurate 3D Point Cloud Registration," ICRA 2021.</li>
 <li>K. Koide et al., "Globally Consistent 3D LiDAR Mapping with GPU-accelerated GICP Matching Cost Factors," IEEE RA-L, 2021.</li>
+<li>C. Ulaş, H. Temeltaş, "3D Multi-Layered Normal Distribution Transform for Fast and Long Range Scan Matching," J. Intell. Robot. Syst., 2013. (ML-NDT)</li>
+<li>劉 陽 ほか, 「F3-SLAM：柔軟なセンサ構成に対応した高速かつ高精度な SLAM」, 計測自動制御学会論文集, Vol.60, No.12, pp.631–637, 2024. <a href="https://www.jstage.jst.go.jp/article/sicetr/60/12/60_631/_article/-char/ja/">J-STAGE</a></li>
 <li>著者の実装: <a href="https://github.com/koide3/fast_gicp">fast_gicp</a>, <a href="https://github.com/koide3/small_gicp">small_gicp</a>, <a href="https://github.com/koide3/gtsam_points">gtsam_points</a>, <a href="https://github.com/koide3/ndt_omp">ndt_omp</a> (高速な NDT)</li>
 </ul>
 <label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="03_point_cloud_registration"> この章を読んだ</label>

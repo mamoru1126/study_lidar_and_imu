@@ -15,6 +15,7 @@ exercises:
 	$(PY) exercises/ex02b_least_squares.py
 	$(PY) exercises/ex03a_matching_methods.py
 	$(PY) exercises/ex03b_icp_2d.py
+	$(PY) exercises/ex03c_f3slam_multires.py
 	$(PY) exercises/ex04_vgicp_2d.py
 	$(PY) exercises/ex05_imu.py
 	$(PY) exercises/ex06_factor_graph.py

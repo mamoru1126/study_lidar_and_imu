@@ -6,6 +6,7 @@
 
 - Markdown の数式 ($...$, ```math) は KaTeX で表示します (tools/site/katex に同梱。オフラインでも表示できます)
 - <!-- demo:NAME --> の位置にインタラクティブデモを埋め込みます (tools/site/demos.js)
+  <!-- demo:NAME:MODE --> とすると、最初に選ばれているモードを指定できます
 - 図 (docs/figures) と共通アセット (tools/site) を html/ にコピーします
 - html/data/sliding_window_result.js は演習 7 が生成します (このスクリプトでは消しません)
 """
@@ -35,7 +36,7 @@ CHAPTERS = [
     ("00_roadmap", "学習ロードマップ", "論文をひとことで。目的関数の全体像と、必要な知識の地図。", [], "15 分"),
     ("01_coordinates_and_rotation", "座標と回転", "回転行列、SO(3) と SE(3)、Exp と Log、摂動でヤコビアンを求める。", ["math"], "2〜3 時間"),
     ("02_probability_and_least_squares", "確率と最小二乗", "誤差ベクトル、正規分布の −1/2、共分散行列、最尤推定、ガウス・ニュートン法。", ["math", "opt"], "3 時間"),
-    ("03_point_cloud_registration", "スキャンマッチング", "ICP・NDT・GICP・VGICP を図で比べる。NDT と GICP の違い。コストを因子にする意味。", ["lidar"], "3〜4 時間"),
+    ("03_point_cloud_registration", "スキャンマッチング", "ICP・NDT・GICP・VGICP を図で比べる。NDT と GICP の違い。F3-SLAM の複数解像度ボクセル。コストを因子にする意味。", ["lidar"], "3〜4 時間"),
     ("04_imu_and_preintegration", "IMU と事前積分", "比力とバイアス、ドリフトの速さ、ΔR・Δv・Δp による事前積分。", ["imu"], "3 時間"),
     ("05_factor_graph", "ファクターグラフ", "変数と因子、H のスパース性、GTSAM の使い方、iSAM2 の考え方。", ["opt"], "2 時間"),
     ("06_fixed_lag_smoothing", "固定ラグ平滑化と周辺化", "ウィンドウ最適化、シューア補行列、キーフレーム、密結合。", ["opt", "lidar", "imu"], "2〜3 時間"),
@@ -99,6 +100,7 @@ def preprocess(text: str) -> str:
     # 「HTML 版では…」の注記は HTML では不要
     text = re.sub(r"^> \*\*HTML 版\*\*.*\n(?:>.*\n)*", "", text, flags=re.M)
     # デモの埋め込み位置
+    text = re.sub(r"<!-- demo:(\w+):(\w+) -->", r'<div data-demo="\1" data-mode="\2"></div>', text)
     text = re.sub(r"<!-- demo:(\w+) -->", r'<div data-demo="\1"></div>', text)
     # リンクの書き換え
     text = re.sub(r"\]\((\d\d_[\w]+)\.md(#[^)]*)?\)", lambda m: f"]({m.group(1)}.html{m.group(2) or ''})", text)

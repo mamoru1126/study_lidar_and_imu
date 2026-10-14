@@ -754,17 +754,22 @@
 
   // ------------------------------------------------------------------ 7. NDT / VGICP / GICP の地図の作り方
   function demoVoxel(root) {
-    var body = shell(root, "NDT・VGICP・GICP の地図の作り方", "同じ点群から作る分布を切り替えて比べよう。ボクセルの大きさや位置を変えると、NDT の穴や角のぼやけ方が変わる");
+    var body = root.getAttribute("data-mode") === "f3"
+      ? shell(root, "F3-SLAM: 点ごとに選ばれるボクセル", "大きさが半分ずつの 3 層のボクセルから、点ごとに「平面で、なるべく大きい」ものが選ばれる。ボクセルの大きさを変えて、壁・角・柱で選ばれ方がどう変わるか見よう")
+      : shell(root, "NDT・VGICP・GICP の地図の作り方", "同じ点群から作る分布を切り替えて比べよう。ボクセルの大きさや位置を変えると、NDT の穴や角のぼやけ方が変わる");
     var canvas = el("canvas", { "aria-label": "ボクセルと正規分布の比較" });
     body.appendChild(canvas);
-    var mode = "ndt";
+    var mode = root.getAttribute("data-mode") || "ndt";
     var controls = el("div", { class: "controls" });
-    controls.appendChild(seg([["ndt", "NDT"], ["vgicp", "VGICP"], ["gicp", "GICP (点ごと)"]], mode, function (m) { mode = m; draw(); }));
+    controls.appendChild(seg([["ndt", "NDT"], ["vgicp", "VGICP"], ["gicp", "GICP (点ごと)"], ["f3", "F3-SLAM"]], mode, function (m) { mode = m; draw(); }));
     body.appendChild(controls);
     var sliders = el("div", { class: "controls" });
+    // 同じページに 2 つ置いても id が重ならないようにする
+    demoVoxel.count = (demoVoxel.count || 0) + 1;
+    var idSuffix = demoVoxel.count > 1 ? "-" + demoVoxel.count : "";
     function slider(label, id, min, max, step, val, fmt) {
       var lab = el("label", { class: "slider-row" }, "<span>" + label + "</span>");
-      var sl = el("input", { type: "range", id: id, min: min, max: max, step: step, value: val });
+      var sl = el("input", { type: "range", id: id + idSuffix, min: min, max: max, step: step, value: val });
       var out = el("b", { style: "font-family:var(--font-mono);font-weight:500;font-size:13px" });
       lab.appendChild(sl); lab.appendChild(out);
       sliders.appendChild(lab);
@@ -773,9 +778,9 @@
       sl.addEventListener("input", function () { upd(); draw(); });
       return sl;
     }
-    var sV = slider("ボクセルの大きさ", "vox-size", "0.4", "2.5", "0.1", "1.0", function (v) { return v.toFixed(1) + " m"; });
+    var sV = slider("ボクセルの大きさ", "vox-size", "0.4", "3.0", "0.1", "1.0", function (v) { return v.toFixed(1) + " m"; });
     var sO = slider("格子をずらす", "vox-shift", "0", "1", "0.05", "0", function (v) { return (v * 100).toFixed(0) + " %"; });
-    var sM = slider("NDT の最少点数", "vox-min", "1", "8", "1", "3", function (v) { return v.toFixed(0) + " 点"; });
+    var sM = slider("最少点数 (NDT・F3)", "vox-min", "1", "8", "1", "3", function (v) { return v.toFixed(0) + " 点"; });
     body.appendChild(sliders);
     var readout = el("div", { class: "readout" });
     body.appendChild(readout);
@@ -784,6 +789,11 @@
 
     // 部屋の角・壁・柱を、センサ (0, 0) から見た LiDAR のように点で表す (遠いほどまばら)
     var segs = [[-5, -2.4, 3.5, -2.4], [-5, -2.4, -5, 3.0], [-5, 3.0, -2.2, 4.2], [1.2, 0.6, 2.2, 0.6], [2.2, 0.6, 2.2, 1.6], [2.2, 1.6, 1.2, 1.6], [3.5, -2.4, 4.6, -1.2]];
+    // 円柱 (平面でない形の例)。センサから見える側だけ点になる
+    for (var ci = 0; ci < 10; ci++) {
+      var a0 = -0.15 * Math.PI + ci * 0.09 * Math.PI, a1 = a0 + 0.09 * Math.PI, cx = -2.2, cy = 1.9, cr = 0.4;
+      segs.push([cx + cr * Math.cos(a0), cy + cr * Math.sin(a0), cx + cr * Math.cos(a1), cy + cr * Math.sin(a1)]);
+    }
     var g = gaussFactory(mulberry32(17));
     var pts = [];
     segs.forEach(function (sg) {
@@ -825,6 +835,52 @@
       ctx.globalAlpha = 0.25; ctx.fillStyle = fill; ctx.fill();
       ctx.globalAlpha = 1; ctx.strokeStyle = stroke; ctx.lineWidth = 1.3; ctx.stroke();
     }
+    // F3-SLAM: 3 層のボクセル (大きさ s, s/2, s/4) を作り、点ごとに「平面で、なるべく大きい」ボクセルを選ぶ
+    function drawF3(ctx, V, s0, sh, minPts) {
+      var sizes = [s0, s0 / 2, s0 / 4], THETA = 0.01, cols = [css("--lidar"), css("--map"), css("--imu")];
+      var layers = sizes.map(function (s) {
+        var cells = {};
+        pts.forEach(function (p) {
+          var k = Math.floor((p[0] - sh) / s) + "," + Math.floor((p[1] - sh) / s);
+          var c = cells[k] || (cells[k] = { n: 0, sx: 0, sy: 0, sxx: 0, sxy: 0, syy: 0 });
+          c.n++; c.sx += p[0]; c.sy += p[1]; c.sxx += p[0] * p[0]; c.sxy += p[0] * p[1]; c.syy += p[1] * p[1];
+        });
+        Object.keys(cells).forEach(function (k) {
+          var c = cells[k], mx = c.sx / c.n, my = c.sy / c.n;
+          c.mx = mx; c.my = my;
+          c.a = c.sxx / c.n - mx * mx; c.b = c.sxy / c.n - mx * my; c.c = c.syy / c.n - my * my;
+          var e = eig2(c.a, c.b, c.c);
+          c.plane = c.n >= minPts && e[0] > 0 && e[1] / e[0] < THETA;
+          c.e = e;
+        });
+        return { s: s, cells: cells };
+      });
+      var chosen = {}, count = [0, 0, 0, 0, 0];
+      pts.forEach(function (p) {
+        var pick = null;
+        for (var li = 0; li < layers.length; li++) {
+          var L = layers[li], k = Math.floor((p[0] - sh) / L.s) + "," + Math.floor((p[1] - sh) / L.s), c = L.cells[k];
+          if (!c || c.n < minPts || Math.hypot(p[0] - c.mx, p[1] - c.my) > L.s) continue;
+          pick = [li, k, c];
+          if (c.plane) break;
+        }
+        if (pick) chosen[pick[0] + "|" + pick[1]] = pick;
+      });
+      Object.keys(chosen).forEach(function (key) {
+        var li = chosen[key][0], k = chosen[key][1], c = chosen[key][2], s = layers[li].s, ij = k.split(",").map(Number);
+        count[li]++; count[c.plane ? 3 : 4]++;
+        if (c.plane) {
+          var ang = c.e[2], h = 0.45 * s;
+          ctx.strokeStyle = css("--ink"); ctx.lineWidth = 2.4;
+          ctx.beginPath(); ctx.moveTo(V.x(c.mx - h * Math.cos(ang)), V.y(c.my - h * Math.sin(ang))); ctx.lineTo(V.x(c.mx + h * Math.cos(ang)), V.y(c.my + h * Math.sin(ang))); ctx.stroke();
+        } else {
+          ell(ctx, V, c.mx, c.my, c.a, c.b, c.c, 0.45 * s, "#e87ba4", "#c2507c");
+        }
+        ctx.strokeStyle = cols[li]; ctx.lineWidth = 2;
+        ctx.strokeRect(V.x(ij[0] * s + sh), V.y((ij[1] + 1) * s + sh), s * V.s, s * V.s);
+      });
+      return count;
+    }
     function draw() {
       var vs = parseFloat(sV.value), sh = parseFloat(sO.value) * vs, minPts = parseInt(sM.value, 10);
       var f = fitCanvas(canvas, 0.72), ctx = f.ctx, V = view(B, f.w, f.h, 6);
@@ -835,14 +891,14 @@
         (cells[k] = cells[k] || []).push(i);
       });
       var keys = Object.keys(cells), nOk = 0, nHole = 0;
-      if (mode !== "gicp") {
+      if (mode !== "gicp" && mode !== "f3") {
         ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
         ctx.beginPath();
         for (var x = Math.floor((B[0] - sh) / vs) * vs + sh; x <= B[1]; x += vs) { ctx.moveTo(V.x(x), V.y(B[2])); ctx.lineTo(V.x(x), V.y(B[3])); }
         for (var y = Math.floor((B[2] - sh) / vs) * vs + sh; y <= B[3]; y += vs) { ctx.moveTo(V.x(B[0]), V.y(y)); ctx.lineTo(V.x(B[1]), V.y(y)); }
         ctx.stroke();
       }
-      keys.forEach(function (k) {
+      if (mode !== "f3") keys.forEach(function (k) {
         var ids = cells[k], ij = k.split(",").map(Number);
         var mx = 0, my = 0;
         ids.forEach(function (i) { mx += pts[i][0]; my += pts[i][1]; }); mx /= ids.length; my /= ids.length;
@@ -871,12 +927,18 @@
       if (mode === "gicp") {
         pts.forEach(function (p, i) { ell(ctx, V, p[0], p[1], pcov[i][0], pcov[i][1], pcov[i][2], 0.16, css("--opt"), css("--opt")); });
       }
+      var f3count = null;
+      if (mode === "f3") f3count = drawF3(ctx, V, vs, sh, minPts);
       ctx.fillStyle = css("--muted");
       pts.forEach(function (p) { ctx.beginPath(); ctx.arc(V.x(p[0]), V.y(p[1]), 2, 0, 7); ctx.fill(); });
       ctx.fillStyle = css("--ink");
       ctx.beginPath(); ctx.moveTo(V.x(0), V.y(0.22)); ctx.lineTo(V.x(-0.16), V.y(-0.12)); ctx.lineTo(V.x(0.16), V.y(-0.12)); ctx.fill();
       var html = "<span>点 <b>" + pts.length + "</b></span>";
-      if (mode === "gicp") {
+      if (mode === "f3") {
+        var lv = [vs, vs / 2, vs / 4];
+        html += "<span>選ばれたボクセル: " + lv.map(function (s, i) { return s.toFixed(2) + " m <b>" + f3count[i] + "</b>"; }).join(" / ") + "</span><span>平面 <b>" + f3count[3] + "</b> 非平面 <b>" + f3count[4] + "</b></span>";
+        note.textContent = "F3-SLAM は大きさが半分ずつの 3 層のボクセルを持ち、点ごとに大きいボクセルから調べて「平面 (2D では線) で、なるべく大きい」ものを選ぶ。太い直線 = 平面として点対面で合わせる。桃色の楕円 = 非平面として点対分布 (NDT 型) で合わせる。枠の色は選ばれた層 (青 > 緑 > 橙 の順に小さい)。ボクセルの大きさのスライダーは一番上の層の大きさ。";
+      } else if (mode === "gicp") {
         html += "<span>分布 <b>" + pts.length + "</b> 個 (点ごと)</span>";
         note.textContent = "GICP は点ごとに、近くの 8 点から分布を作る。ボクセルで区切らないので、角でも壁ごとに向きの正しい分布になる。その代わり、対応を探すたびに最近傍点の探索 (kd-tree) が必要。";
       } else if (mode === "ndt") {
