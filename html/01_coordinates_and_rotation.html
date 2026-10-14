@@ -179,12 +179,127 @@ GTSAM もこの方式です。</p>
 <p>GLIM の論文 (RAS 2024) に出てくる VGICP 因子のヤコビアン
 <span class="arithmatex">\(\mathbf{A}_k = [\,\mathbf{R}_{ij}[\boldsymbol{\mu}_k]_\times,\ -\mathbf{R}_{ij}\,]\)</span> なども、この計算の応用です
 (符号は誤差の定義の向きで変わります)。</p>
-<blockquote>
-<p><strong>右摂動と左摂動</strong>
-<span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> (右から掛ける) と <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\mathbf{R}\)</span> (左から掛ける) の 2 流派があります。
-右はセンサ座標系で、左は世界座標系で微小回転を考えることに相当します。GTSAM は右摂動です。
-論文やコードを読むときは、どちらを使っているかを最初に確認しましょう。</p>
-</blockquote>
+<h3 id="右摂動と左摂動-δ-はどの座標系の回転か">右摂動と左摂動: δ はどの座標系の回転か</h3>
+<p>ここまでは「<span class="arithmatex">\(\mathbf{R}\)</span> に <strong>右から</strong> <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> を掛ける」と決めて計算しました。
+実は <strong>左から</strong> 掛ける流儀もあり、文献によってどちらも使われます。</p>
+<div class="arithmatex">\[
+\text{右摂動: } \mathbf{R}' = \mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})
+\]</div>
+<div class="arithmatex">\[
+\text{左摂動: } \mathbf{R}' = \operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}
+\]</div>
+<p>どちらも「<span class="arithmatex">\(\mathbf{R}\)</span> の近くの回転」を表せますが、<strong>同じ <span class="arithmatex">\(\boldsymbol{\delta}\)</span> でも意味する回転が違います</strong>。</p>
+<ul>
+<li>右摂動の <span class="arithmatex">\(\boldsymbol{\delta}\)</span> は、<strong>センサ座標系の軸</strong> (センサの前・左・上) まわりの回転</li>
+<li>左摂動の <span class="arithmatex">\(\boldsymbol{\delta}\)</span> は、<strong>世界座標系の軸</strong> (地図の x・y・z) まわりの回転</li>
+</ul>
+<p>なぜそうなるのかを、3 つの見方で説明します。
+前提として、この章の <span class="arithmatex">\(\mathbf{R}\)</span> は「センサ座標の点を世界座標に移す回転」(<span class="arithmatex">\(\mathbf{R}_{\text{world}\leftarrow\text{sensor}}\)</span>) です。</p>
+<h4 id="理由-1-点に掛ける順番を追う">理由 1: 点に掛ける順番を追う</h4>
+<p>回転を点 <span class="arithmatex">\(\mathbf{p}\)</span> (センサ座標) に作用させると、行列は <strong>点に近い方、つまり右から順に</strong> 作用します。
+大事なのは、<span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> が作用する瞬間に、点がどの座標系で表されているかです。</p>
+<div class="arithmatex">\[
+\text{右摂動: }\ \mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{p}
+= \mathbf{R}\,\underbrace{\bigl(\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{p}\bigr)}_{\text{センサ座標のまま回す}}
+\]</div>
+<div class="arithmatex">\[
+\text{左摂動: }\ \operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}\,\mathbf{p}
+= \operatorname{Exp}(\boldsymbol{\delta})\,\underbrace{\bigl(\mathbf{R}\,\mathbf{p}\bigr)}_{\text{もう世界座標}}
+\]</div>
+<p><img alt="右摂動と左摂動で Exp(δ) が作用する座標系" src="figures/fig_left_right_perturbation.svg" /></p>
+<ul>
+<li><strong>右摂動</strong>: <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> が作用するとき、点はまだセンサ座標で表されています。
+  センサ座標の中で「x 軸まわりに回す」と言えば、それはセンサの x 軸 (例えばロボットの前方向) まわりです。
+  回し終わってから <span class="arithmatex">\(\mathbf{R}\)</span> で世界に移すので、<span class="arithmatex">\(\boldsymbol{\delta}\)</span> の軸はセンサの軸になります。</li>
+<li><strong>左摂動</strong>: 先に <span class="arithmatex">\(\mathbf{R}\)</span> で世界座標に移してから <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> が作用します。
+  世界座標の中で「x 軸まわりに回す」と言えば、それは地図の x 軸まわりです。</li>
+</ul>
+<p>行列 <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> そのものは同じでも、<strong>作用する相手 (点) がどちらの座標系で書かれているか</strong> で、軸の意味が変わるのです。</p>
+<h4 id="理由-2-添字のルールで確かめる">理由 2: 添字のルールで確かめる</h4>
+<p>2 節の「添字を左 ← 右と読む」ルールでも確かめられます。<span class="arithmatex">\(\mathbf{R} = \mathbf{R}_{\text{w}\leftarrow\text{s}}\)</span> (w = 世界, s = センサ) です。</p>
+<ul>
+<li>右摂動 <span class="arithmatex">\(\mathbf{R}_{\text{w}\leftarrow\text{s}}\operatorname{Exp}(\boldsymbol{\delta})\)</span>:
+  <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> は右隣の添字 s とつながる必要があるので、「s の座標 → s の座標」の変換です。
+  入力も出力もセンサ座標なので、これは <strong>センサ座標系の中での回転</strong> です。</li>
+<li>左摂動 <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}_{\text{w}\leftarrow\text{s}}\)</span>:
+  <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> は左隣の添字 w の後に来るので、「w の座標 → w の座標」の変換、
+  つまり <strong>世界座標系の中での回転</strong> です。</li>
+</ul>
+<h4 id="理由-3-具体例で同じ-δ-が別の動きになるのを見る">理由 3: 具体例で、同じ δ が別の動きになるのを見る</h4>
+<p>ロボットが地図の上で <strong>左に 90° 向いている</strong> (yaw = 90°) とします。センサ座標は x = 前、y = 左、z = 上 です。</p>
+<div class="arithmatex">\[
+\mathbf{R} = \begin{bmatrix} 0 & -1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+\]</div>
+<p><span class="arithmatex">\(\mathbf{R}\)</span> の各列は、センサの x, y, z 軸を世界座標で表したものです。したがって</p>
+<ul>
+<li>センサの前 (x 軸) は、世界の +y 方向を向いている (1 列目 = (0, 1, 0))</li>
+<li>センサの左 (y 軸) は、世界の −x 方向を向いている (2 列目 = (−1, 0, 0))</li>
+</ul>
+<p>ここに <span class="arithmatex">\(\boldsymbol{\delta} = (0.1,\ 0,\ 0)\)</span> (「x 軸まわりに 0.1 rad」) を加えます。</p>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>右摂動 R Exp(δ)</th>
+<th>左摂動 Exp(δ) R</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>軸</td>
+<td>センサの x 軸 = ロボットの前</td>
+<td>世界の x 軸 = ロボットの右</td>
+</tr>
+<tr>
+<td>動き</td>
+<td><strong>ロール</strong> (左側が持ち上がる)</td>
+<td><strong>ピッチ</strong> (機首が上がる)</td>
+</tr>
+<tr>
+<td>前方向</td>
+<td>(0, 1, 0) のまま</td>
+<td>(0, 0.995, <strong>0.100</strong>)</td>
+</tr>
+<tr>
+<td>左方向</td>
+<td>(−0.995, 0, <strong>0.100</strong>)</td>
+<td>(−1, 0, 0) のまま</td>
+</tr>
+</tbody>
+</table>
+<p>(前方向・左方向は回転後の向きを世界座標で表したもの。z 成分が正なら上を向いたということ)</p>
+<p>同じ <span class="arithmatex">\(\boldsymbol{\delta}\)</span> なのに、右摂動ではロール、左摂動ではピッチになります。
+ロボットがたまたま世界の x 軸方向を向いていれば (yaw = 0°) 両者は一致しますが、
+向きが変わると一致しなくなります。演習 1 の 7 節で、この表の数値を計算して確かめられます。</p>
+<h4 id="2-つの関係-回転軸を座標変換するだけ">2 つの関係: 回転軸を座標変換するだけ</h4>
+<p>右摂動の <span class="arithmatex">\(\boldsymbol{\delta}_{\text{s}}\)</span> (センサ座標) と左摂動の <span class="arithmatex">\(\boldsymbol{\delta}_{\text{w}}\)</span> (世界座標) が同じ回転を表す、つまり</p>
+<div class="arithmatex">\[
+\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta}_{\text{s}}) = \operatorname{Exp}(\boldsymbol{\delta}_{\text{w}})\,\mathbf{R}
+\]</div>
+<p>となるのは、次の関係のときです。</p>
+<div class="arithmatex">\[
+\boldsymbol{\delta}_{\text{w}} = \mathbf{R}\,\boldsymbol{\delta}_{\text{s}}
+\]</div>
+<p>上の具体例なら、<span class="arithmatex">\(\boldsymbol{\delta}_{\text{s}} = (0.1, 0, 0)\)</span> (センサの前方向の軸) は <span class="arithmatex">\(\boldsymbol{\delta}_{\text{w}} = \mathbf{R}\boldsymbol{\delta}_{\text{s}} = (0, 0.1, 0)\)</span> (世界の y 軸) に対応します。</p>
+<p>回転ベクトルは「回転軸の向き × 角度」なので、センサ座標で書いた回転軸を <span class="arithmatex">\(\mathbf{R}\)</span> で世界座標に書き直せば、
+世界座標で書いた回転軸になる、というだけのことです。
+(式としては <span class="arithmatex">\(\mathbf{R}[\boldsymbol{\delta}]_\times\mathbf{R}^\top = [\mathbf{R}\boldsymbol{\delta}]_\times\)</span> から導けます。
+SE(3) では随伴行列 <span class="arithmatex">\(\mathrm{Ad}_{\mathbf{T}}\)</span> が同じ役割をします)</p>
+<h4 id="どちらを使うと何が変わるのか">どちらを使うと何が変わるのか</h4>
+<p>最適化が収束すれば、どちらの流儀でも同じ姿勢が得られます。変わるのは <span class="arithmatex">\(\boldsymbol{\delta}\)</span> と、それに関係する量の <strong>表し方</strong> です。</p>
+<ul>
+<li><strong>ヤコビアンの形</strong>: <span class="arithmatex">\(\partial(\mathbf{R}\mathbf{p})/\partial\boldsymbol{\delta}\)</span> は、右摂動なら <span class="arithmatex">\(-\mathbf{R}[\mathbf{p}]_\times\)</span>、左摂動なら <span class="arithmatex">\(-[\mathbf{R}\mathbf{p}]_\times\)</span> です。
+  論文の式をコードに写すとき、流儀を混ぜると形や符号が合わなくなります。</li>
+<li><strong>共分散の意味</strong>: 推定の不確かさ (共分散) も <span class="arithmatex">\(\boldsymbol{\delta}\)</span> の座標系で表されます。
+  GTSAM は右摂動なので、<code>Pose3</code> の共分散は <strong>センサ (ボディ) 座標系</strong> で書かれています。
+  共分散の「x 方向の分散」は地図の x 方向ではなく、ロボットの前方向の分散です。
+  地図の座標で見たいときは、回転部分なら <span class="arithmatex">\(\mathbf{R}\boldsymbol{\Sigma}\mathbf{R}^\top\)</span> のように変換します。</li>
+<li><strong>IMU との相性</strong>: ジャイロはセンサ座標の角速度 <span class="arithmatex">\(\boldsymbol{\omega}\)</span> を測るので、姿勢の積分は
+  <span class="arithmatex">\(\mathbf{R}_{k+1} = \mathbf{R}_k\operatorname{Exp}(\boldsymbol{\omega}\Delta t)\)</span> と <strong>右から</strong> 掛ける形になります (<a href="04_imu_and_preintegration.html">04 章</a>)。
+  右摂動を使えば、IMU の計測と推定の誤差を同じセンサ座標系で扱えます。GTSAM や多くの LiDAR・IMU の手法が右摂動を使う理由の 1 つです。</li>
+</ul>
+<p>論文やコードを読むときは、まず「更新が <span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> か <span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\mathbf{R}\)</span> か」を確認しましょう。
+それが分かれば、ヤコビアンや共分散がどの座標系で書かれているかも分かります。</p>
 <h2 id="6-se3-の場合">6. SE(3) の場合</h2>
 <p>姿勢全体 <span class="arithmatex">\(\mathbf{T}\)</span> も同じように、6 次元の更新量 <span class="arithmatex">\(\boldsymbol{\xi} = (\boldsymbol{\delta}_\text{rot}, \boldsymbol{\delta}_\text{trans})\)</span> を使って
 <span class="arithmatex">\(\mathbf{T} \leftarrow \mathbf{T}\operatorname{Exp}(\boldsymbol{\xi})\)</span> と更新します。
@@ -205,6 +320,7 @@ GTSAM の <code>Pose3</code> は回転 3 成分 → 並進 3 成分の順に並�
 <li>回転の合成の順番を入れ替えると結果が変わることを確認</li>
 <li>解析的に求めたヤコビアン <span class="arithmatex">\(-\mathbf{R}[\mathbf{p}]_\times\)</span> と数値微分が一致することを確認</li>
 <li>相対姿勢 <span class="arithmatex">\(\mathbf{T}_i^{-1}\mathbf{T}_j\)</span> で点を変換</li>
+<li>右摂動と左摂動で、同じ <span class="arithmatex">\(\boldsymbol{\delta}\)</span> がロールとピッチという別の動きになることを確認</li>
 </ul>
 <h2 id="理解度チェック">理解度チェック</h2>
 <ol>
@@ -212,6 +328,7 @@ GTSAM の <code>Pose3</code> は回転 3 成分 → 並進 3 成分の順に並�
 <li><span class="arithmatex">\(\mathbf{T}_i\)</span>, <span class="arithmatex">\(\mathbf{T}_j\)</span> が世界座標での姿勢のとき、フレーム j で観測した点をフレーム i の座標に移す変換は?</li>
 <li>最適化の更新で <span class="arithmatex">\(\mathbf{R} + \Delta\mathbf{R}\)</span> としてはいけないのはなぜ? 代わりにどうする?</li>
 <li><span class="arithmatex">\(\dfrac{\partial(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})}{\partial\boldsymbol{\delta}}\)</span> を導出せよ。</li>
+<li>右摂動 <span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> の <span class="arithmatex">\(\boldsymbol{\delta}\)</span> がセンサ座標系の回転になるのはなぜ?</li>
 </ol>
 <details>
 <summary>答えの例</summary>
@@ -220,6 +337,7 @@ GTSAM の <code>Pose3</code> は回転 3 成分 → 並進 3 成分の順に並�
 <li><span class="arithmatex">\(\mathbf{T}_{ij} = \mathbf{T}_i^{-1}\mathbf{T}_j\)</span>。</li>
 <li>足し算すると直交性が崩れて回転行列でなくなる。回転ベクトル <span class="arithmatex">\(\boldsymbol{\delta}\)</span> で更新量を表し、<span class="arithmatex">\(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\)</span> と掛け算で更新する。</li>
 <li><span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta}) \approx \mathbf{I} + [\boldsymbol{\delta}]_\times\)</span> を使って <span class="arithmatex">\(-\mathbf{R}[\mathbf{p}]_\times\)</span>。</li>
+<li>点 <span class="arithmatex">\(\mathbf{p}\)</span> に作用させると <span class="arithmatex">\(\mathbf{R}(\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})\)</span> となり、<span class="arithmatex">\(\operatorname{Exp}(\boldsymbol{\delta})\)</span> は <span class="arithmatex">\(\mathbf{R}\)</span> で世界座標に移す <strong>前の</strong>、センサ座標で表された点を回すから。左摂動では世界座標に移した <strong>後の</strong> 点を回すので、世界座標系の回転になる。</li>
 </ol>
 </details>
 <h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>

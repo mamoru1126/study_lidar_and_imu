@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 500 470" width="500" height="470" font-family="'Noto Sans JP','Hiragino Sans','Yu Gothic','Meiryo',sans-serif">
+  <style>
+    .t { font-size: 16px; fill: #1f2733; }
+    .s { font-size: 14px; fill: #586273; }
+    .h { font-size: 17px; font-weight: 700; fill: #1f2733; }
+    .m { font-size: 18px; fill: #1f2733; font-style: italic; }
+    .sensor { fill: #e8f0fb; stroke: #2a78d6; stroke-width: 1.6; }
+    .world { fill: #e3f5ee; stroke: #1baf7a; stroke-width: 1.6; }
+    .a { stroke: #586273; stroke-width: 2; fill: none; marker-end: url(#ah); }
+    .ad { stroke: #eb6834; stroke-width: 3; fill: none; marker-end: url(#ao); }
+  </style>
+  <defs>
+    <marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#586273"/></marker>
+    <marker id="ao" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#eb6834"/></marker>
+  </defs>
+  <rect x="0" y="0" width="500" height="470" fill="#ffffff"/>
+
+  <!-- column headers -->
+  <text x="125" y="28" class="h" text-anchor="middle">右摂動</text>
+  <text x="125" y="50" class="s" text-anchor="middle">R Exp(δ) p</text>
+  <text x="375" y="28" class="h" text-anchor="middle">左摂動</text>
+  <text x="375" y="50" class="s" text-anchor="middle">Exp(δ) R p</text>
+  <line x1="250" y1="14" x2="250" y2="396" stroke="#e3e6eb" stroke-width="1.2"/>
+
+  <!-- right perturbation (left column) -->
+  <rect x="35" y="66" width="180" height="58" rx="9" class="sensor"/>
+  <text x="125" y="92" class="m" text-anchor="middle">p</text>
+  <text x="125" y="113" class="s" text-anchor="middle">センサ座標</text>
+  <path d="M125,124 L125,190" class="ad"/>
+  <text x="135" y="152" class="t" fill="#eb6834">Exp(δ)</text>
+  <text x="135" y="172" class="s">センサの軸で回す</text>
+  <rect x="35" y="194" width="180" height="58" rx="9" class="sensor"/>
+  <text x="125" y="220" class="m" text-anchor="middle">Exp(δ) p</text>
+  <text x="125" y="241" class="s" text-anchor="middle">まだセンサ座標</text>
+  <path d="M125,252 L125,318" class="a"/>
+  <text x="135" y="280" class="t">R</text>
+  <text x="135" y="300" class="s">世界座標へ移す</text>
+  <rect x="35" y="322" width="180" height="58" rx="9" class="world"/>
+  <text x="125" y="348" class="m" text-anchor="middle">R Exp(δ) p</text>
+  <text x="125" y="369" class="s" text-anchor="middle">世界座標</text>
+
+  <!-- left perturbation (right column) -->
+  <rect x="285" y="66" width="180" height="58" rx="9" class="sensor"/>
+  <text x="375" y="92" class="m" text-anchor="middle">p</text>
+  <text x="375" y="113" class="s" text-anchor="middle">センサ座標</text>
+  <path d="M375,124 L375,190" class="a"/>
+  <text x="385" y="152" class="t">R</text>
+  <text x="385" y="172" class="s">世界座標へ移す</text>
+  <rect x="285" y="194" width="180" height="58" rx="9" class="world"/>
+  <text x="375" y="220" class="m" text-anchor="middle">R p</text>
+  <text x="375" y="241" class="s" text-anchor="middle">もう世界座標</text>
+  <path d="M375,252 L375,318" class="ad"/>
+  <text x="385" y="280" class="t" fill="#eb6834">Exp(δ)</text>
+  <text x="385" y="300" class="s">世界の軸で回す</text>
+  <rect x="285" y="322" width="180" height="58" rx="9" class="world"/>
+  <text x="375" y="348" class="m" text-anchor="middle">Exp(δ) R p</text>
+  <text x="375" y="369" class="s" text-anchor="middle">世界座標</text>
+
+  <!-- legend -->
+  <rect x="20" y="414" width="16" height="16" rx="3" class="sensor"/><text x="44" y="427" class="s">センサ座標の点</text>
+  <rect x="170" y="414" width="16" height="16" rx="3" class="world"/><text x="194" y="427" class="s">世界座標の点</text>
+  <path d="M318,422 L350,422" class="ad"/><text x="358" y="427" class="s">Exp(δ) が作用</text>
+  <text x="20" y="458" class="s">行列は点に近い方 (右) から順に作用する</text>
+</svg>

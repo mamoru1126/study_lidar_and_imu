@@ -244,6 +244,7 @@ th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--lin
 th { font-family: var(--font-display); font-weight: 700; background: color-mix(in srgb, var(--code-bg) 60%, var(--surface)); white-space: nowrap; }
 tr:last-child td { border-bottom: 0; }
 td { font-variant-numeric: tabular-nums; }
+td:first-child { min-width: 5.5em; }
 
 figure.fig, p > img:only-child { display: block; }
 .fig {

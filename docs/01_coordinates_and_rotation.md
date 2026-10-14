@@ -172,10 +172,128 @@ GLIM の論文 (RAS 2024) に出てくる VGICP 因子のヤコビアン
 $\mathbf{A}_k = [\,\mathbf{R}_{ij}[\boldsymbol{\mu}_k]_\times,\ -\mathbf{R}_{ij}\,]$ なども、この計算の応用です
 (符号は誤差の定義の向きで変わります)。
 
-> **右摂動と左摂動**
-> $\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})$ (右から掛ける) と $\operatorname{Exp}(\boldsymbol{\delta})\mathbf{R}$ (左から掛ける) の 2 流派があります。
-> 右はセンサ座標系で、左は世界座標系で微小回転を考えることに相当します。GTSAM は右摂動です。
-> 論文やコードを読むときは、どちらを使っているかを最初に確認しましょう。
+### 右摂動と左摂動: δ はどの座標系の回転か
+
+ここまでは「$\mathbf{R}$ に **右から** $\operatorname{Exp}(\boldsymbol{\delta})$ を掛ける」と決めて計算しました。
+実は **左から** 掛ける流儀もあり、文献によってどちらも使われます。
+
+```math
+\text{右摂動: } \mathbf{R}' = \mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})
+```
+
+```math
+\text{左摂動: } \mathbf{R}' = \operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}
+```
+
+どちらも「$\mathbf{R}$ の近くの回転」を表せますが、**同じ $\boldsymbol{\delta}$ でも意味する回転が違います**。
+
+- 右摂動の $\boldsymbol{\delta}$ は、**センサ座標系の軸** (センサの前・左・上) まわりの回転
+- 左摂動の $\boldsymbol{\delta}$ は、**世界座標系の軸** (地図の x・y・z) まわりの回転
+
+なぜそうなるのかを、3 つの見方で説明します。
+前提として、この章の $\mathbf{R}$ は「センサ座標の点を世界座標に移す回転」($\mathbf{R}_{\text{world}\leftarrow\text{sensor}}$) です。
+
+#### 理由 1: 点に掛ける順番を追う
+
+回転を点 $\mathbf{p}$ (センサ座標) に作用させると、行列は **点に近い方、つまり右から順に** 作用します。
+大事なのは、$\operatorname{Exp}(\boldsymbol{\delta})$ が作用する瞬間に、点がどの座標系で表されているかです。
+
+```math
+\text{右摂動: }\ \mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{p}
+= \mathbf{R}\,\underbrace{\bigl(\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{p}\bigr)}_{\text{センサ座標のまま回す}}
+```
+
+```math
+\text{左摂動: }\ \operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}\,\mathbf{p}
+= \operatorname{Exp}(\boldsymbol{\delta})\,\underbrace{\bigl(\mathbf{R}\,\mathbf{p}\bigr)}_{\text{もう世界座標}}
+```
+
+![右摂動と左摂動で Exp(δ) が作用する座標系](figures/fig_left_right_perturbation.svg)
+
+- **右摂動**: $\operatorname{Exp}(\boldsymbol{\delta})$ が作用するとき、点はまだセンサ座標で表されています。
+  センサ座標の中で「x 軸まわりに回す」と言えば、それはセンサの x 軸 (例えばロボットの前方向) まわりです。
+  回し終わってから $\mathbf{R}$ で世界に移すので、$\boldsymbol{\delta}$ の軸はセンサの軸になります。
+- **左摂動**: 先に $\mathbf{R}$ で世界座標に移してから $\operatorname{Exp}(\boldsymbol{\delta})$ が作用します。
+  世界座標の中で「x 軸まわりに回す」と言えば、それは地図の x 軸まわりです。
+
+行列 $\operatorname{Exp}(\boldsymbol{\delta})$ そのものは同じでも、**作用する相手 (点) がどちらの座標系で書かれているか** で、軸の意味が変わるのです。
+
+#### 理由 2: 添字のルールで確かめる
+
+2 節の「添字を左 ← 右と読む」ルールでも確かめられます。$\mathbf{R} = \mathbf{R}_{\text{w}\leftarrow\text{s}}$ (w = 世界, s = センサ) です。
+
+- 右摂動 $\mathbf{R}_{\text{w}\leftarrow\text{s}}\operatorname{Exp}(\boldsymbol{\delta})$:
+  $\operatorname{Exp}(\boldsymbol{\delta})$ は右隣の添字 s とつながる必要があるので、「s の座標 → s の座標」の変換です。
+  入力も出力もセンサ座標なので、これは **センサ座標系の中での回転** です。
+- 左摂動 $\operatorname{Exp}(\boldsymbol{\delta})\,\mathbf{R}_{\text{w}\leftarrow\text{s}}$:
+  $\operatorname{Exp}(\boldsymbol{\delta})$ は左隣の添字 w の後に来るので、「w の座標 → w の座標」の変換、
+  つまり **世界座標系の中での回転** です。
+
+#### 理由 3: 具体例で、同じ δ が別の動きになるのを見る
+
+ロボットが地図の上で **左に 90° 向いている** (yaw = 90°) とします。センサ座標は x = 前、y = 左、z = 上 です。
+
+```math
+\mathbf{R} = \begin{bmatrix} 0 & -1 & 0 \\ 1 & 0 & 0 \\ 0 & 0 & 1 \end{bmatrix}
+```
+
+$\mathbf{R}$ の各列は、センサの x, y, z 軸を世界座標で表したものです。したがって
+
+- センサの前 (x 軸) は、世界の +y 方向を向いている (1 列目 = (0, 1, 0))
+- センサの左 (y 軸) は、世界の −x 方向を向いている (2 列目 = (−1, 0, 0))
+
+ここに $\boldsymbol{\delta} = (0.1,\ 0,\ 0)$ (「x 軸まわりに 0.1 rad」) を加えます。
+
+| | 右摂動 R Exp(δ) | 左摂動 Exp(δ) R |
+| --- | --- | --- |
+| 軸 | センサの x 軸 = ロボットの前 | 世界の x 軸 = ロボットの右 |
+| 動き | **ロール** (左側が持ち上がる) | **ピッチ** (機首が上がる) |
+| 前方向 | (0, 1, 0) のまま | (0, 0.995, **0.100**) |
+| 左方向 | (−0.995, 0, **0.100**) | (−1, 0, 0) のまま |
+
+(前方向・左方向は回転後の向きを世界座標で表したもの。z 成分が正なら上を向いたということ)
+
+同じ $\boldsymbol{\delta}$ なのに、右摂動ではロール、左摂動ではピッチになります。
+ロボットがたまたま世界の x 軸方向を向いていれば (yaw = 0°) 両者は一致しますが、
+向きが変わると一致しなくなります。演習 1 の 7 節で、この表の数値を計算して確かめられます。
+
+#### 2 つの関係: 回転軸を座標変換するだけ
+
+右摂動の $\boldsymbol{\delta}_{\text{s}}$ (センサ座標) と左摂動の $\boldsymbol{\delta}_{\text{w}}$ (世界座標) が同じ回転を表す、つまり
+
+```math
+\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta}_{\text{s}}) = \operatorname{Exp}(\boldsymbol{\delta}_{\text{w}})\,\mathbf{R}
+```
+
+となるのは、次の関係のときです。
+
+```math
+\boldsymbol{\delta}_{\text{w}} = \mathbf{R}\,\boldsymbol{\delta}_{\text{s}}
+```
+
+上の具体例なら、$\boldsymbol{\delta}_{\text{s}} = (0.1, 0, 0)$ (センサの前方向の軸) は $\boldsymbol{\delta}_{\text{w}} = \mathbf{R}\boldsymbol{\delta}_{\text{s}} = (0, 0.1, 0)$ (世界の y 軸) に対応します。
+
+回転ベクトルは「回転軸の向き × 角度」なので、センサ座標で書いた回転軸を $\mathbf{R}$ で世界座標に書き直せば、
+世界座標で書いた回転軸になる、というだけのことです。
+(式としては $\mathbf{R}[\boldsymbol{\delta}]_\times\mathbf{R}^\top = [\mathbf{R}\boldsymbol{\delta}]_\times$ から導けます。
+SE(3) では随伴行列 $\mathrm{Ad}_{\mathbf{T}}$ が同じ役割をします)
+
+#### どちらを使うと何が変わるのか
+
+最適化が収束すれば、どちらの流儀でも同じ姿勢が得られます。変わるのは $\boldsymbol{\delta}$ と、それに関係する量の **表し方** です。
+
+- **ヤコビアンの形**: $\partial(\mathbf{R}\mathbf{p})/\partial\boldsymbol{\delta}$ は、右摂動なら $-\mathbf{R}[\mathbf{p}]_\times$、左摂動なら $-[\mathbf{R}\mathbf{p}]_\times$ です。
+  論文の式をコードに写すとき、流儀を混ぜると形や符号が合わなくなります。
+- **共分散の意味**: 推定の不確かさ (共分散) も $\boldsymbol{\delta}$ の座標系で表されます。
+  GTSAM は右摂動なので、`Pose3` の共分散は **センサ (ボディ) 座標系** で書かれています。
+  共分散の「x 方向の分散」は地図の x 方向ではなく、ロボットの前方向の分散です。
+  地図の座標で見たいときは、回転部分なら $\mathbf{R}\boldsymbol{\Sigma}\mathbf{R}^\top$ のように変換します。
+- **IMU との相性**: ジャイロはセンサ座標の角速度 $\boldsymbol{\omega}$ を測るので、姿勢の積分は
+  $\mathbf{R}_{k+1} = \mathbf{R}_k\operatorname{Exp}(\boldsymbol{\omega}\Delta t)$ と **右から** 掛ける形になります ([04 章](04_imu_and_preintegration.md))。
+  右摂動を使えば、IMU の計測と推定の誤差を同じセンサ座標系で扱えます。GTSAM や多くの LiDAR・IMU の手法が右摂動を使う理由の 1 つです。
+
+論文やコードを読むときは、まず「更新が $\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})$ か $\operatorname{Exp}(\boldsymbol{\delta})\mathbf{R}$ か」を確認しましょう。
+それが分かれば、ヤコビアンや共分散がどの座標系で書かれているかも分かります。
 
 ## 6. SE(3) の場合
 
@@ -205,6 +323,7 @@ python exercises/ex01_rotation.py
 - 回転の合成の順番を入れ替えると結果が変わることを確認
 - 解析的に求めたヤコビアン $-\mathbf{R}[\mathbf{p}]_\times$ と数値微分が一致することを確認
 - 相対姿勢 $\mathbf{T}_i^{-1}\mathbf{T}_j$ で点を変換
+- 右摂動と左摂動で、同じ $\boldsymbol{\delta}$ がロールとピッチという別の動きになることを確認
 
 ## 理解度チェック
 
@@ -212,6 +331,7 @@ python exercises/ex01_rotation.py
 2. $\mathbf{T}_i$, $\mathbf{T}_j$ が世界座標での姿勢のとき、フレーム j で観測した点をフレーム i の座標に移す変換は?
 3. 最適化の更新で $\mathbf{R} + \Delta\mathbf{R}$ としてはいけないのはなぜ? 代わりにどうする?
 4. $\dfrac{\partial(\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})}{\partial\boldsymbol{\delta}}$ を導出せよ。
+5. 右摂動 $\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})$ の $\boldsymbol{\delta}$ がセンサ座標系の回転になるのはなぜ?
 
 <details markdown="1">
 <summary>答えの例</summary>
@@ -220,6 +340,7 @@ python exercises/ex01_rotation.py
 2. $\mathbf{T}_{ij} = \mathbf{T}_i^{-1}\mathbf{T}_j$。
 3. 足し算すると直交性が崩れて回転行列でなくなる。回転ベクトル $\boldsymbol{\delta}$ で更新量を表し、$\mathbf{R}\operatorname{Exp}(\boldsymbol{\delta})$ と掛け算で更新する。
 4. $\operatorname{Exp}(\boldsymbol{\delta}) \approx \mathbf{I} + [\boldsymbol{\delta}]_\times$ を使って $-\mathbf{R}[\mathbf{p}]_\times$。
+5. 点 $\mathbf{p}$ に作用させると $\mathbf{R}(\operatorname{Exp}(\boldsymbol{\delta})\mathbf{p})$ となり、$\operatorname{Exp}(\boldsymbol{\delta})$ は $\mathbf{R}$ で世界座標に移す **前の**、センサ座標で表された点を回すから。左摂動では世界座標に移した **後の** 点を回すので、世界座標系の回転になる。
 
 </details>
 
