@@ -326,7 +326,7 @@ details[open] summary { border-bottom: 1px solid var(--line); margin-bottom: 8px
 .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .controls label { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
 .controls input[type="range"] { width: min(220px, 60vw); accent-color: var(--accent); }
-.controls label.slider-row { display: grid; grid-template-columns: 7.5em minmax(0, 1fr) 6.5em; width: 100%; max-width: 34em; gap: 10px; }
+.controls label.slider-row { display: grid; grid-template-columns: 8.5em minmax(0, 1fr) 6.5em; width: 100%; max-width: 34em; gap: 10px; }
 .controls label.slider-row input[type="range"] { width: 100%; }
 .btn {
   font: inherit; font-size: 14px; line-height: 1;

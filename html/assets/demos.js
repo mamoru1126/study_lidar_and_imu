@@ -752,8 +752,149 @@
     draw();
   }
 
+  // ------------------------------------------------------------------ 7. NDT / VGICP / GICP の地図の作り方
+  function demoVoxel(root) {
+    var body = shell(root, "NDT・VGICP・GICP の地図の作り方", "同じ点群から作る分布を切り替えて比べよう。ボクセルの大きさや位置を変えると、NDT の穴や角のぼやけ方が変わる");
+    var canvas = el("canvas", { "aria-label": "ボクセルと正規分布の比較" });
+    body.appendChild(canvas);
+    var mode = "ndt";
+    var controls = el("div", { class: "controls" });
+    controls.appendChild(seg([["ndt", "NDT"], ["vgicp", "VGICP"], ["gicp", "GICP (点ごと)"]], mode, function (m) { mode = m; draw(); }));
+    body.appendChild(controls);
+    var sliders = el("div", { class: "controls" });
+    function slider(label, id, min, max, step, val, fmt) {
+      var lab = el("label", { class: "slider-row" }, "<span>" + label + "</span>");
+      var sl = el("input", { type: "range", id: id, min: min, max: max, step: step, value: val });
+      var out = el("b", { style: "font-family:var(--font-mono);font-weight:500;font-size:13px" });
+      lab.appendChild(sl); lab.appendChild(out);
+      sliders.appendChild(lab);
+      function upd() { out.textContent = fmt(parseFloat(sl.value)); }
+      upd();
+      sl.addEventListener("input", function () { upd(); draw(); });
+      return sl;
+    }
+    var sV = slider("ボクセルの大きさ", "vox-size", "0.4", "2.5", "0.1", "1.0", function (v) { return v.toFixed(1) + " m"; });
+    var sO = slider("格子をずらす", "vox-shift", "0", "1", "0.05", "0", function (v) { return (v * 100).toFixed(0) + " %"; });
+    var sM = slider("NDT の最少点数", "vox-min", "1", "8", "1", "3", function (v) { return v.toFixed(0) + " 点"; });
+    body.appendChild(sliders);
+    var readout = el("div", { class: "readout" });
+    body.appendChild(readout);
+    var note = el("p", { class: "eq-note", style: "font-size:13px;color:var(--muted);min-height:0" });
+    body.appendChild(note);
+
+    // 部屋の角・壁・柱を、センサ (0, 0) から見た LiDAR のように点で表す (遠いほどまばら)
+    var segs = [[-5, -2.4, 3.5, -2.4], [-5, -2.4, -5, 3.0], [-5, 3.0, -2.2, 4.2], [1.2, 0.6, 2.2, 0.6], [2.2, 0.6, 2.2, 1.6], [2.2, 1.6, 1.2, 1.6], [3.5, -2.4, 4.6, -1.2]];
+    var g = gaussFactory(mulberry32(17));
+    var pts = [];
+    segs.forEach(function (sg) {
+      var L = Math.hypot(sg[2] - sg[0], sg[3] - sg[1]), t = 0;
+      while (t <= L) {
+        var x = sg[0] + (sg[2] - sg[0]) * t / L, y = sg[1] + (sg[3] - sg[1]) * t / L;
+        pts.push([x + 0.012 * g(), y + 0.012 * g()]);
+        t += 0.05 * Math.hypot(x, y); // 角度間隔一定のビーム → 距離に比例して点の間隔が広がる
+      }
+    });
+    function eig2(a, b, c) {
+      var tr = a + c, d = Math.sqrt(Math.max((a - c) * (a - c) / 4 + b * b, 0));
+      var l1 = tr / 2 + d, l2 = tr / 2 - d;
+      var ang = Math.abs(b) < 1e-12 ? (a >= c ? 0 : Math.PI / 2) : Math.atan2(l1 - a, b);
+      return [l1, Math.max(l2, 0), ang];
+    }
+    // 点ごとの共分散 (近傍 8 点、GICP 流に固有値を (1, 0.001) にそろえる)
+    var pcov = pts.map(function (p) {
+      var nb = pts.map(function (q) { return [(q[0] - p[0]) * (q[0] - p[0]) + (q[1] - p[1]) * (q[1] - p[1]), q]; })
+        .sort(function (u, v) { return u[0] - v[0]; }).slice(0, 8).map(function (u) { return u[1]; });
+      var mx = 0, my = 0;
+      nb.forEach(function (q) { mx += q[0]; my += q[1]; }); mx /= nb.length; my /= nb.length;
+      var a = 0, b = 0, c = 0;
+      nb.forEach(function (q) { a += (q[0] - mx) * (q[0] - mx); b += (q[0] - mx) * (q[1] - my); c += (q[1] - my) * (q[1] - my); });
+      var e = eig2(a, b, c), co = Math.cos(e[2]), si = Math.sin(e[2]), l1 = 1, l2 = 0.001;
+      return [co * co * l1 + si * si * l2, co * si * (l1 - l2), si * si * l1 + co * co * l2];
+    });
+    var B = [-5.6, 5.2, -3.0, 4.8];
+    function ell(ctx, V, mx, my, a, b, c, len, fill, stroke) {
+      var e = eig2(a, b, c), r1 = len, r2 = len * Math.sqrt(e[1] / Math.max(e[0], 1e-12));
+      r2 = Math.max(r2, len * 0.06);
+      ctx.beginPath();
+      for (var k = 0; k <= 40; k++) {
+        var t = k / 40 * 2 * Math.PI, u = r1 * Math.cos(t), v = r2 * Math.sin(t);
+        var x = mx + Math.cos(e[2]) * u - Math.sin(e[2]) * v, y = my + Math.sin(e[2]) * u + Math.cos(e[2]) * v;
+        (k ? ctx.lineTo : ctx.moveTo).call(ctx, V.x(x), V.y(y));
+      }
+      ctx.closePath();
+      ctx.globalAlpha = 0.25; ctx.fillStyle = fill; ctx.fill();
+      ctx.globalAlpha = 1; ctx.strokeStyle = stroke; ctx.lineWidth = 1.3; ctx.stroke();
+    }
+    function draw() {
+      var vs = parseFloat(sV.value), sh = parseFloat(sO.value) * vs, minPts = parseInt(sM.value, 10);
+      var f = fitCanvas(canvas, 0.72), ctx = f.ctx, V = view(B, f.w, f.h, 6);
+      ctx.clearRect(0, 0, f.w, f.h);
+      var cells = {};
+      pts.forEach(function (p, i) {
+        var k = Math.floor((p[0] - sh) / vs) + "," + Math.floor((p[1] - sh) / vs);
+        (cells[k] = cells[k] || []).push(i);
+      });
+      var keys = Object.keys(cells), nOk = 0, nHole = 0;
+      if (mode !== "gicp") {
+        ctx.strokeStyle = css("--line"); ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (var x = Math.floor((B[0] - sh) / vs) * vs + sh; x <= B[1]; x += vs) { ctx.moveTo(V.x(x), V.y(B[2])); ctx.lineTo(V.x(x), V.y(B[3])); }
+        for (var y = Math.floor((B[2] - sh) / vs) * vs + sh; y <= B[3]; y += vs) { ctx.moveTo(V.x(B[0]), V.y(y)); ctx.lineTo(V.x(B[1]), V.y(y)); }
+        ctx.stroke();
+      }
+      keys.forEach(function (k) {
+        var ids = cells[k], ij = k.split(",").map(Number);
+        var mx = 0, my = 0;
+        ids.forEach(function (i) { mx += pts[i][0]; my += pts[i][1]; }); mx /= ids.length; my /= ids.length;
+        if (mode === "ndt") {
+          if (ids.length < minPts) {
+            nHole++;
+            ctx.globalAlpha = 0.16; ctx.fillStyle = css("--imu");
+            ctx.fillRect(V.x(ij[0] * vs + sh), V.y((ij[1] + 1) * vs + sh), vs * V.s, vs * V.s);
+            ctx.globalAlpha = 1;
+            return;
+          }
+          var a = 0, b = 0, c = 0;
+          ids.forEach(function (i) { var dx = pts[i][0] - mx, dy = pts[i][1] - my; a += dx * dx; b += dx * dy; c += dy * dy; });
+          a /= ids.length; b /= ids.length; c /= ids.length;
+          var e = eig2(a, b, c), lmin = 0.01 * e[0];
+          if (e[1] < lmin) { var co = Math.cos(e[2]), si = Math.sin(e[2]); a = co * co * e[0] + si * si * lmin; b = co * si * (e[0] - lmin); c = si * si * e[0] + co * co * lmin; }
+          nOk++;
+          ell(ctx, V, mx, my, a, b, c, 0.45 * vs, css("--lidar"), css("--lidar"));
+        } else if (mode === "vgicp") {
+          var A = 0, Bc = 0, C = 0;
+          ids.forEach(function (i) { A += pcov[i][0]; Bc += pcov[i][1]; C += pcov[i][2]; });
+          nOk++;
+          ell(ctx, V, mx, my, A / ids.length, Bc / ids.length, C / ids.length, 0.45 * vs, css("--map"), css("--map"));
+        }
+      });
+      if (mode === "gicp") {
+        pts.forEach(function (p, i) { ell(ctx, V, p[0], p[1], pcov[i][0], pcov[i][1], pcov[i][2], 0.16, css("--opt"), css("--opt")); });
+      }
+      ctx.fillStyle = css("--muted");
+      pts.forEach(function (p) { ctx.beginPath(); ctx.arc(V.x(p[0]), V.y(p[1]), 2, 0, 7); ctx.fill(); });
+      ctx.fillStyle = css("--ink");
+      ctx.beginPath(); ctx.moveTo(V.x(0), V.y(0.22)); ctx.lineTo(V.x(-0.16), V.y(-0.12)); ctx.lineTo(V.x(0.16), V.y(-0.12)); ctx.fill();
+      var html = "<span>点 <b>" + pts.length + "</b></span>";
+      if (mode === "gicp") {
+        html += "<span>分布 <b>" + pts.length + "</b> 個 (点ごと)</span>";
+        note.textContent = "GICP は点ごとに、近くの 8 点から分布を作る。ボクセルで区切らないので、角でも壁ごとに向きの正しい分布になる。その代わり、対応を探すたびに最近傍点の探索 (kd-tree) が必要。";
+      } else if (mode === "ndt") {
+        html += "<span>点の入ったボクセル <b>" + keys.length + "</b></span><span>分布ができた <b>" + nOk + "</b></span><span>穴 (点が足りない) <b>" + nHole + "</b></span>";
+        note.textContent = "NDT はボクセル内の点の位置から共分散を計算する。点が少ないボクセル (オレンジ) は分布を作れず、地図に穴が開く。センサから遠く点がまばらな所ほど穴が増える。角を含むボクセルは丸っこい分布になる。";
+      } else {
+        html += "<span>点の入ったボクセル <b>" + keys.length + "</b></span><span>分布ができた <b>" + nOk + "</b> (全部)</span>";
+        note.textContent = "VGICP はボクセル内の「点ごとの分布 (GICP と同じもの)」を平均する。点が 1 つでも分布ができるので穴が開かない。角を含むボクセルが丸っこくなるのは NDT と同じ。";
+      }
+      readout.innerHTML = html;
+    }
+    onResize(canvas, draw);
+    onTheme(draw);
+    draw();
+  }
+
   // ------------------------------------------------------------------ 起動
-  var map = { icp: demoICP, imu: demoIMU, equation: demoEquation, replay: demoReplay, cov: demoCov };
+  var map = { icp: demoICP, imu: demoIMU, equation: demoEquation, replay: demoReplay, cov: demoCov, voxel: demoVoxel };
   document.querySelectorAll("[data-demo]").forEach(function (node) {
     var f = map[node.getAttribute("data-demo")];
     if (f) {

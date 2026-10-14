@@ -1,4 +1,4 @@
-"""演習 3: スキャンマッチング (ICP → 点対面 ICP → GICP)
+"""演習 3b: スキャンマッチング (ICP → 点対面 ICP → GICP)
 
 対応する資料: docs/03_point_cloud_registration.md
 
@@ -12,7 +12,7 @@
   1. GICP / 点対線 ICP は点対点 ICP より少ない反復で収束する
   2. 初期値のずれが大きいと、どの手法も失敗しやすくなる (収束域がある)
 
-実行: python exercises/ex03_icp_2d.py
+実行: python exercises/ex03b_icp_2d.py
 """
 
 import numpy as np

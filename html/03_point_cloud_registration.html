@@ -21,144 +21,328 @@
 <nav class="rail" aria-label="章の一覧"><h2>目次</h2><ul class="toc"><li><a href="index.html"><span class="num">◆</span><span>はじめに</span><span></span></a></li><li><a href="00_roadmap.html"><span class="num">00</span><span>学習ロードマップ</span><span class="done" data-done-slug="00_roadmap" title="読了"></span></a></li><li><a href="01_coordinates_and_rotation.html"><span class="num">01</span><span>座標と回転</span><span class="done" data-done-slug="01_coordinates_and_rotation" title="読了"></span></a></li><li><a href="02_probability_and_least_squares.html"><span class="num">02</span><span>確率と最小二乗</span><span class="done" data-done-slug="02_probability_and_least_squares" title="読了"></span></a></li><li><a href="03_point_cloud_registration.html" aria-current="page"><span class="num">03</span><span>スキャンマッチング</span><span class="done" data-done-slug="03_point_cloud_registration" title="読了"></span></a></li><li><a href="04_imu_and_preintegration.html"><span class="num">04</span><span>IMU と事前積分</span><span class="done" data-done-slug="04_imu_and_preintegration" title="読了"></span></a></li><li><a href="05_factor_graph.html"><span class="num">05</span><span>ファクターグラフ</span><span class="done" data-done-slug="05_factor_graph" title="読了"></span></a></li><li><a href="06_fixed_lag_smoothing.html"><span class="num">06</span><span>固定ラグ平滑化と周辺化</span><span class="done" data-done-slug="06_fixed_lag_smoothing" title="読了"></span></a></li><li><a href="07_map_based_localization.html"><span class="num">07</span><span>既知地図上の自己位置推定</span><span class="done" data-done-slug="07_map_based_localization" title="読了"></span></a></li><li><a href="08_paper_walkthrough.html"><span class="num">08</span><span>論文精読ガイド</span><span class="done" data-done-slug="08_paper_walkthrough" title="読了"></span></a></li><li><a href="09_author_code_guide.html"><span class="num">09</span><span>著者のコード案内</span><span class="done" data-done-slug="09_author_code_guide" title="読了"></span></a></li><li><a href="10_glossary.html"><span class="num">10</span><span>用語集</span><span class="done" data-done-slug="10_glossary" title="読了"></span></a></li></ul><h2>リンク</h2><p class="rail-note"><a href="https://staff.aist.go.jp/k.koide/assets/pdf/robomech2023.pdf" target="_blank" rel="noopener">論文 PDF</a><br><a href="https://github.com/mamoru1126/study_lidar_and_imu" target="_blank" rel="noopener">このリポジトリ</a><br><a href="https://github.com/koide3" target="_blank" rel="noopener">著者の GitHub (koide3)</a></p><p class="rail-note">各章の最後で「読んだ」にチェックすると、ここに印が付きます (このブラウザにだけ保存)。</p></nav>
 <main>
 <article class="article">
-<div class="chapter-meta"><span class="chip time">第 03 章</span><span class="chip lidar">LiDAR</span><span class="chip time">目安 3 時間</span></div>
-<h1 id="03-スキャンマッチング-icp--ndt--gicp--vgicp">03. スキャンマッチング (ICP → NDT → GICP → VGICP)</h1>
+<div class="chapter-meta"><span class="chip time">第 03 章</span><span class="chip lidar">LiDAR</span><span class="chip time">目安 3〜4 時間</span></div>
+<h1 id="03-スキャンマッチング-icpndtgicpvgicp">03. スキャンマッチング (ICP・NDT・GICP・VGICP)</h1>
 <h2 id="この章のゴール">この章のゴール</h2>
 <ul>
-<li>点群の前処理 (ダウンサンプリング、近傍探索、共分散推定) が分かる</li>
-<li>ICP・点対面 ICP・NDT・GICP・VGICP の違いを、図とコスト関数で説明できる</li>
-<li>VGICP が速く、GPU と相性が良い理由が分かる</li>
+<li>スキャンマッチング (点群の位置合わせ) が何をする処理か、なぜ繰り返し計算になるのかが分かる</li>
+<li>点群の前処理 (ダウンサンプリング、近傍探索、点ごとの共分散と法線) が分かる</li>
+<li>点対点 ICP・点対面 ICP・NDT・GICP・VGICP を、それぞれ図で説明できる</li>
+<li><strong>NDT と GICP の違い</strong> を、「地図の表し方」「ソース側の扱い」「対応の探し方」「コストの形」の 4 点で説明できる</li>
+<li>VGICP が「NDT の速さ」と「GICP の精度」をどう両立しているかが分かる</li>
 <li>論文が「位置合わせの結果」ではなく「位置合わせのコストそのもの」を因子にしている意味が分かる</li>
 </ul>
 <blockquote>
 <p><strong>論文とのつながり</strong>
 論文の <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span> (フレーム同士) と <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathcal{M})\)</span> (フレームと地図) は、
-どちらも <strong>VGICP</strong> (Voxelized GICP) のコストです。著者自身が提案した手法で、GPU で高速に計算できます。</p>
+どちらも <strong>VGICP</strong> のコストです。VGICP は著者自身が提案した手法で、NDT と GICP の考え方を組み合わせたものです。
+比較手法の hdl_localization は NDT を使っています。この章で両方の違いが分かると、論文の比較実験の意味も見えてきます。</p>
 </blockquote>
+<p>この章の図は、演習 3a (<code>exercises/ex03a_matching_methods.py</code>) で実際の 2D スキャンから作っています。
+すべて同じ場面 (部屋の角と柱の付近) なので、手法ごとの違いを見比べてください。</p>
 <hr />
-<h2 id="1-点群と前処理">1. 点群と前処理</h2>
-<p>LiDAR は周囲の物体までの距離を大量に測り、<strong>点群</strong> (3 次元の点の集まり) を出力します。
-論文の手法は特定のセンサに依存しない設計で、回転式 LiDAR だけでなく RGB-D カメラ (Azure Kinect など) にも
-適用できると述べられています。</p>
-<p>マッチングの前に、たいてい次の前処理をします。</p>
+<h2 id="1-スキャンマッチングとは">1. スキャンマッチングとは</h2>
+<h3 id="11-lidar-の点群">1.1 LiDAR の点群</h3>
+<p>LiDAR はレーザーを周囲に打ち、物体に当たって戻ってくるまでの時間から距離を測ります。
+「どの向きに打ったら、何 m 先に当たったか」を座標に直したものが <strong>点群</strong> です。
+点の座標は <strong>センサ座標系</strong> (LiDAR から見た座標) で表されています。</p>
+<p>点群は物体の表面を <strong>まばらにサンプリングしたもの</strong> です。同じ壁でも、センサの位置が少し違えば、レーザーが当たる場所は違います。
+また、センサから遠いほど隣のビームとの間隔が広がるので、点はまばらになります。</p>
+<h3 id="12-2-つの点群を重ねる問題">1.2 2 つの点群を重ねる問題</h3>
+<p>ロボットが少し動いて、2 回スキャンしたとします。2 つの点群は同じ壁を見ているのに、センサ座標系が違うのでずれて見えます。</p>
+<ul>
+<li><strong>ターゲット</strong>: 動かさない側の点群。前のフレームや、事前に作った地図</li>
+<li><strong>ソース</strong>: 動かす側の点群。新しく取ったスキャン</li>
+</ul>
+<p>ソースを回転・平行移動 (<span class="arithmatex">\(\mathbf{T}\)</span>) して、ターゲットにぴったり重なる <span class="arithmatex">\(\mathbf{T}\)</span> を探すのが <strong>スキャンマッチング</strong> (位置合わせ, registration) です。
+重ねるのに必要な <span class="arithmatex">\(\mathbf{T}\)</span> が、2 つのスキャンの間にロボットがどれだけ動いたか (相対姿勢、<a href="01_coordinates_and_rotation.html">01 章</a>) になります。</p>
+<h3 id="13-なぜ繰り返し計算になるのか">1.3 なぜ繰り返し計算になるのか</h3>
+<p>「ソースのこの点は、ターゲットのあの点と同じ場所」という <strong>対応</strong> が分かっていれば、
+<a href="02_probability_and_least_squares.html">02 章</a> の最小二乗で <span class="arithmatex">\(\mathbf{T}\)</span> が求まります。
+しかし対応は分かりません。そして対応を正しく決めるには、だいたい正しい <span class="arithmatex">\(\mathbf{T}\)</span> が必要です。
+「卵が先か鶏が先か」の状態なので、次の手順を繰り返します。</p>
+<ol>
+<li>今の推定値 <span class="arithmatex">\(\mathbf{T}\)</span> でソースの点を動かす</li>
+<li>それぞれの点の <strong>対応</strong> を (近いものを) 探す</li>
+<li>対応が正しいと仮定して、<strong>誤差</strong> が小さくなるように <span class="arithmatex">\(\mathbf{T}\)</span> を更新する (ガウス・ニュートン法など)</li>
+<li><span class="arithmatex">\(\mathbf{T}\)</span> がほとんど変わらなくなったら終わり。そうでなければ 1 へ</li>
+</ol>
+<p>この骨組みはどの手法でも同じです。手法の違いは、次の 3 つの選び方にあります。</p>
 <table>
 <thead>
 <tr>
-<th>処理</th>
-<th>目的</th>
-<th>典型的な方法</th>
+<th>選ぶもの</th>
+<th>選択肢の例</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>ダウンサンプリング</td>
-<td>点を減らして高速化、密度を均一に</td>
-<td>ボクセルグリッド (各ボクセルの重心を残す)、ランダム間引き</td>
+<td>ターゲット (地図) を何で表すか</td>
+<td>点のまま / 点と面の向き / ボクセルごとの正規分布 / 点ごとの正規分布</td>
 </tr>
 <tr>
-<td>近傍探索</td>
-<td>各点の近くの点を見つける</td>
-<td>kd-tree、ボクセルハッシュ</td>
+<td>対応をどう探すか</td>
+<td>最も近い点を探す (kd-tree) / 点が入ったボクセルを引く</td>
 </tr>
 <tr>
-<td>法線・共分散の推定</td>
-<td>点の周りの面の向き・形を知る</td>
-<td>近傍 k 点の共分散行列を固有値分解</td>
-</tr>
-<tr>
-<td>動きによる歪みの補正 (deskew)</td>
-<td>1 スキャン中にセンサが動いた影響を除く</td>
-<td>IMU で各点の時刻の姿勢を補間</td>
+<td>誤差をどう測るか</td>
+<td>点と点の距離 / 面までの距離 / 分布の中でのありえなさ (マハラノビス距離)</td>
 </tr>
 </tbody>
 </table>
-<h2 id="2-位置合わせ-registration-の問題">2. 位置合わせ (registration) の問題</h2>
-<p>2 つの点群、<strong>ソース</strong> <span class="arithmatex">\(\mathcal{P} = \lbrace\mathbf{p}_k\rbrace\)</span> と <strong>ターゲット</strong> <span class="arithmatex">\(\mathcal{Q}\)</span> があり、
-ソースを動かしてターゲットに重ねる変換 <span class="arithmatex">\(\mathbf{T}\)</span> を求める問題です。
-ソースのどの点がターゲットのどの点に対応するかは分からないので、</p>
-<ol>
-<li>今の <span class="arithmatex">\(\mathbf{T}\)</span> で対応 (近い点どうし) を決める</li>
-<li>対応が正しいとして <span class="arithmatex">\(\mathbf{T}\)</span> を最適化する</li>
-</ol>
-<p>を繰り返します。違いは「何と何の距離を測るか」です。</p>
-<p><img alt="位置合わせの種類" src="figures/fig_registration_types.svg" /></p>
+<p><img alt="各手法が「何と何を比べるか」" src="figures/fig_registration_types.svg" /></p>
+<hr />
+<h2 id="2-前処理">2. 前処理</h2>
+<p>どの手法でも、マッチングの前に点群を整えます。</p>
+<p><img alt="前処理: ダウンサンプリングと点ごとの共分散 (演習 3a)" src="figures/ex03a_1_preprocess.png" /></p>
+<h3 id="21-ダウンサンプリング">2.1 ダウンサンプリング</h3>
+<p>1 回のスキャンには数万〜数十万点あるので、そのままでは計算が重すぎます。
+空間を小さな立方体 (ボクセル、例えば 0.1〜0.25 m) に区切り、各ボクセルの点を 1 点 (重心) にまとめます。
+センサの近くの密な部分が減り、点の密度がそろうという効果もあります (図の b)。</p>
+<h3 id="22-近傍探索と-kd-tree">2.2 近傍探索と kd-tree</h3>
+<p>「ある点の近くにある点」を探す処理は、この後何度も出てきます。全部の点との距離を毎回計算すると遅いので、
+<strong>kd-tree</strong> というデータ構造を使います。空間を x で半分、y で半分、… と交互に分けた木を作っておくと、
+近い点を探すときに遠い枝を丸ごと飛ばせるので、点の数が多くても速く探せます。</p>
+<h3 id="23-点ごとの共分散と法線">2.3 点ごとの共分散と法線</h3>
+<p>ある点の近くの点 (例えば 10〜20 点) を集めて共分散行列を計算すると、その点の周りの <strong>面の形</strong> が分かります
+(<a href="02_probability_and_least_squares.html">02 章</a> 3.3 節)。</p>
+<ul>
+<li>壁の上の点なら、壁に沿う向きには大きく、壁に垂直な向きには小さい「平たい楕円」(3D では平たい楕円体) になる</li>
+<li>一番短い軸の向き (最小固有値の固有ベクトル) が <strong>法線</strong> (面に垂直な向き)。符号は不定なので、センサの方を向くようにそろえる</li>
+</ul>
+<p>図の c で、青い細長い楕円が点ごとの共分散、緑の矢印が法線です。この「点ごとの共分散」が GICP と VGICP の主役になります。</p>
+<blockquote>
+<p>1 回のスキャンの間にもロボットは動くので、スキャンの最初と最後で座標がずれます。
+IMU を使ってこれを直す <strong>歪み補正 (deskew)</strong> もよく行われます (<a href="04_imu_and_preintegration.html">04 章</a>)。</p>
+</blockquote>
+<hr />
 <h2 id="3-点対点-icp">3. 点対点 ICP</h2>
-<p>最も素朴な方法で、最近傍の点との距離の 2 乗和を最小化します。</p>
+<p>最も素朴な方法です (ICP = Iterative Closest Point)。ソースの各点を、ターゲットの <strong>最も近い点</strong> に近づけます。</p>
 <div class="arithmatex">\[
 E(\mathbf{T}) = \sum_k \lVert \mathbf{q}_k - \mathbf{T}\mathbf{p}_k \rVert^2
 \]</div>
-<p>対応が決まっていれば、重心を合わせて SVD を使うと閉じた形で解けます (演習 3 の <code>icp_point_to_point</code>)。
-ただし、LiDAR の点は物体の表面を「まばらにサンプリング」したものなので、2 つのスキャンで同じ場所の点が
-取れているとは限りません。そのため、壁に沿う方向に余計な力がかかり、<strong>収束が遅く、結果が偏り</strong>やすくなります。</p>
+<p><span class="arithmatex">\(\mathbf{p}_k\)</span> はソースの点、<span class="arithmatex">\(\mathbf{q}_k\)</span> はそれに最も近いターゲットの点です。
+対応が決まっていれば、2 つの点群の重心を合わせてから特異値分解 (SVD) を使うと、最適な回転と並進が一発で求まります
+(演習 3b の <code>icp_point_to_point</code>)。</p>
+<p><img alt="点対点 ICP と点対面 ICP (演習 3a)" src="figures/ex03a_2_icp.png" /></p>
+<p><strong>弱点</strong>: 1.1 節の通り、2 つのスキャンでは壁の上の <strong>同じ場所</strong> に点があるとは限りません。
+左の図のように、最も近い点は少し横にずれた場所にあることが多く、矢印が斜めを向きます。
+そのため壁に沿う向きにも余計な力がかかり、<strong>収束が遅く、ずれた位置で止まりやすく</strong> なります。</p>
 <h2 id="4-点対面-icp">4. 点対面 ICP</h2>
-<p>最近傍点の「面」(法線 <span class="arithmatex">\(\mathbf{n}_k\)</span> を持つ平面) までの距離を使います。</p>
+<p>最も近い点そのものではなく、その点を通る <strong>面</strong> (2D では線) までの距離を測ります。法線を <span class="arithmatex">\(\mathbf{n}_k\)</span> とすると</p>
 <div class="arithmatex">\[
 E(\mathbf{T}) = \sum_k \left(\mathbf{n}_k^\top(\mathbf{q}_k - \mathbf{T}\mathbf{p}_k)\right)^2
 \]</div>
-<p>面に沿う方向のずれは誤差にならないので、サンプリング位置の違いに強く、収束がずっと速くなります。</p>
+<p><span class="arithmatex">\(\mathbf{n}_k^\top(\cdots)\)</span> は、ずれのうち法線方向の成分だけを取り出す計算です。
+右の図のように矢印が面に垂直になり、<strong>面に沿う向きのずれは誤差に数えません</strong>。
+サンプリング位置の違いに強く、点対点 ICP よりずっと速く収束します (演習 3b では 3 回の反復で 1 cm 程度まで合います)。</p>
+<hr />
 <h2 id="5-ndt-normal-distributions-transform">5. NDT (Normal Distributions Transform)</h2>
-<p>ターゲットを <strong>ボクセル (立方体のマス)</strong> に分け、各ボクセル内の点の分布を正規分布 (平均・共分散) で表します。
-ソースの各点が、入ったボクセルの分布の中でどれくらい「もっともらしいか」を最大化します。</p>
-<ul>
-<li>長所: 対応点探索が不要 (ボクセルを引くだけ)。地図との照合に広く使われている (Autoware など)</li>
-<li>短所: 1 つのボクセルに十分な点がないと分布が作れない。ボクセルサイズに敏感</li>
-</ul>
-<p>論文の比較手法の 1 つ「NDT スキャンマッチング」はこれです。</p>
-<h2 id="6-gicp-generalized-icp">6. GICP (Generalized ICP)</h2>
-<p>GICP [Segal+ RSS2009] は <strong>ソースの点もターゲットの点も正規分布</strong> とみなします。
-点 <span class="arithmatex">\(\mathbf{p}_k\)</span> の周りの面の形を共分散 <span class="arithmatex">\(\mathbf{C}_k\)</span> で表し、対応点 <span class="arithmatex">\(\mathbf{q}_k\)</span> の共分散を <span class="arithmatex">\(\mathbf{C}'_k\)</span> とすると、</p>
+<h3 id="51-考え方-地図をボクセルごとの正規分布に要約する">5.1 考え方: 地図をボクセルごとの正規分布に要約する</h3>
+<p>NDT は、ターゲットを点のまま使うのをやめて、<strong>格子状のボクセル (例えば 1 m 角) ごとに 1 つの正規分布</strong> で表します。</p>
+<ol>
+<li>ターゲットの空間をボクセルに区切る</li>
+<li>各ボクセルについて、中に入った <strong>点の位置</strong> から平均 <span class="arithmatex">\(\boldsymbol{\mu}\)</span> と共分散 <span class="arithmatex">\(\boldsymbol{\Sigma}\)</span> を計算する</li>
+</ol>
 <div class="arithmatex">\[
-\mathbf{d}_k = \mathbf{q}_k - \mathbf{T}\mathbf{p}_k,
+\boldsymbol{\mu} = \frac{1}{N}\sum_{i=1}^{N} \mathbf{q}_i,
 \qquad
-E(\mathbf{T}) = \sum_k \mathbf{d}_k^\top \left(\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\right)^{-1} \mathbf{d}_k
+\boldsymbol{\Sigma} = \frac{1}{N}\sum_{i=1}^{N} (\mathbf{q}_i - \boldsymbol{\mu})(\mathbf{q}_i - \boldsymbol{\mu})^\top
 \]</div>
-<p>を最小化します。2 つの正規分布の差もまた正規分布で、その共分散が <span class="arithmatex">\(\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\)</span> になる、
-というのが式の意味です (<a href="02_probability_and_least_squares.html">02 章</a> のマハラノビス距離)。</p>
-<p><strong>共分散の正則化</strong>: GICP では、近傍点から求めた共分散の固有値を <span class="arithmatex">\((1, 1, \varepsilon)\)</span> (<span class="arithmatex">\(\varepsilon \approx 10^{-3}\)</span>) に置き換え、
-「面に沿う 2 方向は大きく、法線方向だけ小さい」形にそろえます。こうすると、</p>
+<p>ボクセルの中に壁の一部が通っていれば、壁に沿って細長い楕円になります。
+こうして、地図は「点の集まり」から「楕円の集まり」になります。</p>
+<p><img alt="NDT: ボクセルごとの分布と、ソースの点の採点 (演習 3a)" src="figures/ex03a_3_ndt.png" /></p>
+<h3 id="52-マッチング-ソースの点を入ったボクセルの分布で採点する">5.2 マッチング: ソースの「点」を、入ったボクセルの分布で採点する</h3>
+<p>ソースの点 <span class="arithmatex">\(\mathbf{p}_k\)</span> を <span class="arithmatex">\(\mathbf{T}\)</span> で動かし、<strong>入ったボクセル</strong> の分布で「どれくらいありそうか」を計算します。</p>
+<div class="arithmatex">\[
+\text{スコア}_k = \exp\!\left(-\frac{1}{2}\,(\mathbf{T}\mathbf{p}_k - \boldsymbol{\mu})^\top \boldsymbol{\Sigma}^{-1} (\mathbf{T}\mathbf{p}_k - \boldsymbol{\mu})\right)
+\]</div>
+<p>これは正規分布の山の高さ (頂上を 1 とした値) で、分布の中心に近いほど 1、外れるほど 0 に近づきます
+(右の図の色)。全部の点のスコアの合計が最大になる <span class="arithmatex">\(\mathbf{T}\)</span> を探します。
+実際の実装 (PCL など) では、外れ値の影響を調整する定数を加えた式を、ニュートン法で最大化しています。</p>
+<h3 id="53-ndt-の特徴">5.3 NDT の特徴</h3>
 <ul>
-<li>面に沿う方向のずれはほとんど誤差にならない (点対面 ICP と同じ効果)</li>
-<li>両方の点群の面の向きを考える「面対面」のマッチングになる</li>
+<li><strong>対応探索が速い</strong>: 点の座標からボクセルの番号を計算するだけで、最近傍点を探す必要がない</li>
+<li><strong>外れ値に強い</strong>: 1 点あたりのスコアは最大でも 1 なので、地図と合わない点 (人や車) がコストを大きく乱さない</li>
+<li><strong>点が少ないボクセルでは分布を作れない</strong>: 共分散を計算するには数点以上が必要です (3D の PCL の実装では既定で 6 点)。
+  図のオレンジのボクセルのように、点がまばらな所 (センサから遠い所など) では地図に <strong>穴</strong> が開く</li>
+<li><strong>ボクセルの大きさに敏感</strong>: 小さすぎると穴だらけ、大きすぎると壁の角や細かい形がぼやける。
+  角を含むボクセルは、2 つの壁の点を 1 つの分布にまとめるので丸っこくなる</li>
+<li><strong>ボクセルの境目で不連続</strong>: 点が隣のボクセルに移ると、使う分布が急に切り替わる。
+  隣のボクセルも見る (<code>ndt_omp</code> の DIRECT7 など)、格子を半分ずらしたものを重ねる、などの工夫がある</li>
+<li>平らな壁の点だけからなるボクセルは、共分散が「厚み 0」に近くなり逆行列が計算できないので、
+  小さすぎる固有値を持ち上げる補正を入れる</li>
 </ul>
-<p>という性質が得られ、精度と頑健さが向上します。共分散の正則化の値を変えると、ICP (等方的な分布) や
-点対面 ICP に近づけることもできます。</p>
-<p><img alt="ICP の比較" src="figures/ex03_icp_2d.png" /></p>
-<p>演習 3 では、点対点 ICP が 60 回反復しても数 cm の偏りが残るのに対し、点対線 ICP と GICP は 2〜3 回で
-ほぼ収束することが分かります。</p>
+<hr />
+<h2 id="6-gicp-generalized-icp">6. GICP (Generalized ICP)</h2>
+<h3 id="61-考え方-点ごとに面の向きを持たせ分布と分布を比べる">6.1 考え方: 点ごとに「面の向き」を持たせ、分布と分布を比べる</h3>
+<p>GICP はボクセルを使いません。2.3 節の <strong>点ごとの共分散</strong> を、ターゲットの点にも <strong>ソースの点にも</strong> 持たせます。
+つまり、どちらの点群も「小さな平たい楕円の集まり」として扱い、楕円と楕円を合わせます。</p>
+<p><img alt="GICP: 点ごとの分布どうしの対応 (演習 3a)" src="figures/ex03a_4_gicp.png" /></p>
+<ol>
+<li>各点の共分散を近傍点から計算する (ターゲット: <span class="arithmatex">\(\mathbf{C}^{Q}_k\)</span>、ソース: <span class="arithmatex">\(\mathbf{C}^{P}_k\)</span>)</li>
+<li>ソースの点を <span class="arithmatex">\(\mathbf{T}\)</span> で動かし、kd-tree で <strong>最も近いターゲットの点</strong> を対応にする (ICP と同じ)</li>
+<li>対応のずれ <span class="arithmatex">\(\mathbf{d}_k = \mathbf{q}_k - \mathbf{T}\mathbf{p}_k\)</span> を、2 つの分布を足した共分散で重み付けして測る</li>
+</ol>
+<div class="arithmatex">\[
+E(\mathbf{T}) = \sum_k \mathbf{d}_k^\top \left(\mathbf{C}^{Q}_k + \mathbf{R}\,\mathbf{C}^{P}_k\,\mathbf{R}^\top\right)^{-1} \mathbf{d}_k
+\]</div>
+<h3 id="62-なぜ-2-つの共分散を足すのか">6.2 なぜ 2 つの共分散を足すのか</h3>
+<p>ターゲットの点の位置にも、ソースの点の位置にも「面に沿ってどこにあってもおかしくない」という不確かさがあります。
+2 つの不確かな位置の <strong>差</strong> の不確かさは、それぞれの共分散の <strong>和</strong> になります
+(独立なばらつきは足し合わさる。ソースの共分散は <span class="arithmatex">\(\mathbf{R}\)</span> で回してターゲットの座標系に合わせる)。</p>
+<p>右の図のオレンジの点線が、2 つを足した分布です。ずれ <span class="arithmatex">\(\mathbf{d}\)</span> はこの分布で測られるので、</p>
+<ul>
+<li>楕円の長い向き (面に沿う向き) のずれは小さく数える</li>
+<li>楕円の短い向き (面に垂直な向き) のずれは大きく数える</li>
+</ul>
+<p>ことになります。演習 3a の例では、長さ 0.096 m のずれが、面に垂直な成分のために誤差 1.94 (σ 何個分かの 2 乗) と数えられています。
+両方の点群の面の向きを使うので「<strong>面対面</strong>」のマッチングと呼ばれます。</p>
+<h3 id="63-共分散の正規化とicp-との関係">6.3 共分散の正規化と、ICP との関係</h3>
+<p>GICP では、近傍から求めた共分散の固有値を <strong>(1, 1, ε)</strong> (2D では (1, ε)、ε は 0.001 程度) に置き換えます。
+点の分布の「大きさ」は捨てて、「面の向き」だけを残す操作です。</p>
+<p>この共分散の選び方次第で、GICP は ICP の仲間になります。</p>
+<ul>
+<li>すべての共分散を単位行列にすると → 重みがどの向きも同じになり、<strong>点対点 ICP</strong></li>
+<li>ソース側を 0、ターゲット側を「法線方向だけ小さい」形にすると → <strong>点対面 ICP</strong></li>
+</ul>
+<p>GICP は ICP を一般化 (generalize) したもの、というのが名前の由来です。
+コストは普通の重み付き最小二乗なので、<a href="02_probability_and_least_squares.html">02 章</a> のガウス・ニュートン法で解けます。</p>
+<hr />
+<h2 id="7-ndt-と-gicp-の違い">7. NDT と GICP の違い</h2>
+<p>どちらも「正規分布」を使うので似て見えますが、使い方がまったく違います。</p>
+<h3 id="71-ひとことで言うと">7.1 ひとことで言うと</h3>
+<ul>
+<li><strong>NDT</strong>: 地図を <strong>ボクセルごとの分布に要約</strong> しておき、ソースの <strong>点</strong> を当てはめる</li>
+<li><strong>GICP</strong>: 地図もソースも <strong>点ごとに面の向き (分布)</strong> を持たせ、<strong>面と面</strong> を合わせる</li>
+</ul>
+<h3 id="72-4-つの違い">7.2 4 つの違い</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>NDT</th>
+<th>GICP</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>① 地図 (ターゲット) の表し方</td>
+<td>ボクセルごとに 1 つの分布</td>
+<td>点ごとに 1 つの分布</td>
+</tr>
+<tr>
+<td>分布の作り方</td>
+<td>ボクセル内の点の位置から計算</td>
+<td>近くの点 (10〜20 点) から計算し、形を (1, 1, ε) に正規化</td>
+</tr>
+<tr>
+<td>② ソース側の扱い</td>
+<td>点のまま (分布なし)</td>
+<td>点ごとの分布</td>
+</tr>
+<tr>
+<td>③ 対応の探し方</td>
+<td>点が入ったボクセルを引く (速い)</td>
+<td>kd-tree で最も近い点を探す (遅め)</td>
+</tr>
+<tr>
+<td>④ コスト</td>
+<td>スコア exp(−½ マハラノビス距離²) の和を最大化。1 点あたり上限 1</td>
+<td>マハラノビス距離² の和を最小化 (最小二乗)</td>
+</tr>
+<tr>
+<td>得意なこと</td>
+<td>速い。外れ値の影響を受けにくい</td>
+<td>精度が高い。ボクセルの大きさに左右されない</td>
+</tr>
+<tr>
+<td>苦手なこと</td>
+<td>点がまばらだと穴が開く。ボクセルの大きさに敏感。境目で不連続</td>
+<td>最近傍探索が重い。外れ値は対応距離の上限などで別に対策が必要</td>
+</tr>
+</tbody>
+</table>
+<p><strong>① 分布の単位</strong>: NDT は「ボクセルという決まった枠」で点を区切ってから分布を作るので、
+枠の中に点が少なければ分布ができず、枠の中に角があれば丸っこい分布になります。
+GICP は点ごとに近くの点から分布を作るので、枠に縛られず、角でもそれぞれの壁の向きを保てます。
+下のデモで、ボクセルの大きさや格子の位置を動かすと、NDT の分布がどう変わるかを確かめられます。</p>
+<div data-demo="voxel"></div>
+
+<p><strong>② ソース側</strong>: NDT はソースを点として扱う「点対分布」、GICP は「分布対分布」です。
+GICP はソース側の面の向きも使うので、2 つのスキャンで点の取れ方が違っても安定します。</p>
+<p><strong>③ 対応の探し方</strong>: NDT は「点の座標 ÷ ボクセルの大きさ」でボクセルの番号が決まり、表を 1 回引くだけです。
+GICP は kd-tree をたどって最も近い点を探します。点が多いと、この差が速度の差になります。
+ただし、NDT は <strong>入ったボクセルしか見ない</strong> ので、遠くにある正解の壁には引き寄せられません。
+GICP は対応距離の上限 (例えば 1〜2 m) までなら、少し離れた点にも対応を作れます。</p>
+<p><strong>④ コストの形</strong>: 下の図は、正解の位置からソースを x 方向にずらしたとき、各手法のコストがどう変わるかを描いたものです (演習 3a)。</p>
+<p><img alt="正解のまわりのコストの形 (演習 3a)" src="figures/ex03a_6_cost_shape.png" /></p>
+<ul>
+<li>GICP や ICP のコストは、ずれとともになだらかに増える <strong>広い谷</strong> になっています。最近傍探索で少し離れた点にも対応が付くからです</li>
+<li>NDT のスコアは、正解付近だけが深い <strong>狭い谷</strong> で、少しずれると平らになります。
+  入ったボクセルの分布しか見ないことと、1 点あたりのスコアに上限があることが理由です</li>
+<li>谷が狭いと、初期値が少しずれただけで正しい答えに向かう手がかりがなくなります。
+  実際の NDT では、隣のボクセルも見る、粗いボクセルから細かいボクセルへ段階的に合わせる、などの工夫で谷を広げます</li>
+</ul>
+<blockquote>
+<p>この図は、この教材の単純な実装で作った 1 方向の断面です。実際のライブラリの性能比較ではありません。
+傾向をつかむための図として見てください。</p>
+</blockquote>
+<hr />
+<h2 id="8-vgicp-ndt-の速さと-gicp-の精度を両立する">8. VGICP: NDT の速さと GICP の精度を両立する</h2>
+<p>VGICP (Voxelized GICP) は、論文の著者が提案した手法で、論文のすべてのマッチング因子に使われています。</p>
+<h3 id="81-考え方">8.1 考え方</h3>
+<ul>
+<li>地図は <strong>NDT のようにボクセル</strong> で区切る → 対応探索は表を 1 回引くだけで速い</li>
+<li>ただしボクセルの分布は、点の位置からではなく、<strong>中の点ごとの共分散 (GICP と同じもの) を平均</strong> して作る</li>
+<li>ソース側も <strong>GICP のように点ごとの分布</strong> を持ち、コストは <strong>GICP と同じ最小二乗</strong></li>
+</ul>
+<div class="arithmatex">\[
+\boldsymbol{\mu}^{\text{voxel}} = \frac{1}{N}\sum_{i=1}^{N} \mathbf{q}_i,
+\qquad
+\mathbf{C}^{\text{voxel}} = \frac{1}{N}\sum_{i=1}^{N} \mathbf{C}^{Q}_i
+\]</div>
+<div class="arithmatex">\[
+\begin{aligned}
+E(\mathbf{T}) &= \sum_k \mathbf{d}_k^\top \left(\mathbf{C}^{\text{voxel}}_k + \mathbf{R}\,\mathbf{C}^{P}_k\,\mathbf{R}^\top\right)^{-1}\mathbf{d}_k \\
+\mathbf{d}_k &= \boldsymbol{\mu}^{\text{voxel}}_k - \mathbf{T}\mathbf{p}_k
+\end{aligned}
+\]</div>
+<p><span class="arithmatex">\(\boldsymbol{\mu}^{\text{voxel}}_k\)</span>, <span class="arithmatex">\(\mathbf{C}^{\text{voxel}}_k\)</span> は、動かしたソースの点 <span class="arithmatex">\(\mathbf{T}\mathbf{p}_k\)</span> が入ったボクセルの平均と共分散です。</p>
+<h3 id="82-ndt-との違い-同じボクセルでも分布の作り方が違う">8.2 NDT との違い: 同じボクセルでも分布の作り方が違う</h3>
+<p><img alt="NDT と VGICP のボクセルの分布 (演習 3a)" src="figures/ex03a_5_ndt_vs_vgicp.png" /></p>
+<p>点ごとの共分散は、ボクセルの枠に関係なく近くの点から計算済みです。そのため <strong>点が 1 つしかないボクセルでも、その点の分布がそのままボクセルの分布になり</strong>、NDT のような穴が開きません
+(演習 3a では、NDT は 68 個中 46 個のボクセルでしか分布を作れず、VGICP は 68 個すべてで作れています)。
+一方、角を含むボクセルが丸っこくなるのは NDT と同じです。ボクセルの大きさは NDT ほど大きくせず、
+GLIM では 0.25〜0.5 m 程度を基本にしています。</p>
+<h3 id="83-gpu-と相性が良い理由">8.3 GPU と相性が良い理由</h3>
+<p>VGICP の計算は、ソースの全点について「ボクセルを引く → 2×2 (3D では 3×3) の行列計算をする」を同じように繰り返すだけです。</p>
+<ul>
+<li>kd-tree のように、点ごとに木をたどる回数が違う (処理の分岐が多い) ことがない</li>
+<li>全点が同じ手順なので、GPU の数千のコアに 1 点ずつ割り当てて並列に計算できる</li>
+</ul>
+<p>これが、論文で多数のマッチング因子をリアルタイムに計算できている理由です。</p>
+<h3 id="84-マルチ解像度ボクセル">8.4 マルチ解像度ボクセル</h3>
+<p>VGICP は入ったボクセル 1 つとしか比べないので、7.2 節の NDT と同じく、そのままでは谷が狭くなります。
+そこで、細かいボクセルと粗いボクセルを <strong>両方</strong> 使ってコストを足し合わせます (GLIM の設定 <code>voxelmap_levels</code>)。
+粗いボクセルが遠くからの手がかりになり、細かいボクセルが精度を出します。演習 4 で、粗いボクセルを足すと収束域 (うまく合う初期値の範囲) が広がることを確認できます。</p>
+<p><img alt="VGICP とマルチ解像度 (演習 4)" src="figures/ex04_vgicp_2d.png" /></p>
+<p>さらに論文の手法では、<strong>IMU で予測した姿勢</strong> を初期値にするので、もともと正解に近い所から始められます (<a href="04_imu_and_preintegration.html">04 章</a>)。</p>
+<hr />
+<h2 id="9-手法を動かして比べる">9. 手法を動かして比べる</h2>
+<p>演習 3b では、点対点 ICP・点対面 ICP・GICP を実際に反復させて、収束の速さと初期値への強さを比べます。</p>
+<p><img alt="ICP 系の手法の比較 (演習 3b)" src="figures/ex03_icp_2d.png" /></p>
+<ul>
+<li>収束の速さ (左下): 点対面 ICP と GICP は 2〜3 回の反復でほぼ収束、点対点 ICP は数十回かかり、少しずれた位置で止まる</li>
+<li>初期値への強さ (右下): 初期値のずれが 2 m 程度までは、どの手法もほぼ成功する。それ以上ずれると失敗が増える</li>
+</ul>
 <div data-demo="icp"></div>
 
-<h2 id="7-vgicp-voxelized-gicp">7. VGICP (Voxelized GICP)</h2>
-<p>GICP は各点について kd-tree で最近傍を探す必要があり、点が多いと重くなります。
-VGICP [Koide+ ICRA2021] は、NDT のようにターゲットをボクセルに分けますが、
-<strong>各ボクセルの分布を「中の点の分布 (GICP の共分散) を平均したもの」</strong> として作ります。</p>
-<div class="arithmatex">\[
-\boldsymbol{\mu}^{\text{voxel}} = \frac{1}{N}\sum_{\mathbf{q} \in \text{voxel}} \mathbf{q},
-\qquad
-\mathbf{C}^{\text{voxel}} = \frac{1}{N}\sum_{\mathbf{q} \in \text{voxel}} \mathbf{C}_{\mathbf{q}}
-\]</div>
-<p>ソースの点 <span class="arithmatex">\(\mathbf{p}_k\)</span> は、変換後に入ったボクセルの分布と比べるだけです。</p>
-<div class="arithmatex">\[
-E(\mathbf{T}) = \sum_k \mathbf{d}_k^\top \left(\mathbf{C}^{\text{voxel}}_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top\right)^{-1}\mathbf{d}_k,
-\qquad \mathbf{d}_k = \boldsymbol{\mu}^{\text{voxel}}_k - \mathbf{T}\mathbf{p}_k
-\]</div>
-<p>ポイントは次の 3 つです。</p>
-<ol>
-<li><strong>対応探索がハッシュ表の参照 1 回で済む</strong>: kd-tree の探索が要らない</li>
-<li><strong>点の少ないボクセルでも使える</strong>: NDT はボクセル内の点から共分散を計算するので点が少ないと不安定だが、
-   VGICP は「点ごとの共分散 (近傍から計算済み)」を平均するので 1 点でも分布になる</li>
-<li><strong>GPU 向き</strong>: 全点で同じ計算 (参照 → 行列計算) をするだけで、条件分岐やデータ依存の探索がない。
-   数万点を並列に処理できる</li>
-</ol>
-<h3 id="マルチ解像度ボクセル">マルチ解像度ボクセル</h3>
-<p>VGICP は「点が入ったボクセル 1 つ」としか比べないので、初期値が大きくずれていると正しいボクセルに入らず、
-<strong>収束域 (うまく合う初期値の範囲) が狭く</strong>なります。そこで、細かいボクセルと粗いボクセルを併用します。
-GLIM の設定 <code>voxelmap_levels</code> (例: 2 段) がこれです。演習 4 で、粗いボクセルを足すと収束域が広がることを確認できます。</p>
-<p><img alt="VGICP とマルチ解像度" src="figures/ex04_vgicp_2d.png" /></p>
-<h2 id="8-位置合わせの結果ではなくコストを因子にする">8. 位置合わせの「結果」ではなく「コスト」を因子にする</h2>
+<hr />
+<h2 id="10-位置合わせの結果ではなくコストを因子にする">10. 位置合わせの「結果」ではなく「コスト」を因子にする</h2>
 <p>ここが論文 (と著者の一連の研究) を理解するうえで重要な点です。</p>
 <p><strong>よくある方法 (疎結合・ポーズグラフ)</strong>:
-ICP などで 2 フレーム間の相対姿勢を求め、その結果 (と、だいたいの共分散) を「相対姿勢の観測」として
-グラフに入れます。</p>
+ICP などで 2 フレーム間の相対姿勢を求め、その結果 (と、だいたいの共分散) を「相対姿勢の観測」としてグラフに入れます。</p>
 <p><strong>論文の方法 (マッチングコスト因子)</strong>:
 VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j)\)</span> そのものを因子 <span class="arithmatex">\(f^P(\mathbf{x}_i, \mathbf{x}_j)\)</span> としてグラフに入れます。
 最適化のたびに、今の推定値で対応を取り直して線形化します (GLIM の <code>IntegratedVGICPFactorGPU</code>)。</p>
@@ -171,13 +355,15 @@ VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j
 </ul>
 <p>GLIM の論文では、因子 1 つあたりの線形化結果 (<span class="arithmatex">\(\mathbf{H}\)</span> と <span class="arithmatex">\(\mathbf{b}\)</span> のブロック) を、全点の和として GPU で計算しています。</p>
 <div class="arithmatex">\[
-\mathbf{H}_{ii} = \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{A}_k, \quad
-\mathbf{H}_{ij} = \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k, \quad
-\mathbf{H}_{jj} = \sum_k \mathbf{B}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k
+\begin{aligned}
+\mathbf{H}_{ii} &= \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{A}_k \\
+\mathbf{H}_{ij} &= \sum_k \mathbf{A}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k \\
+\mathbf{H}_{jj} &= \sum_k \mathbf{B}_k^\top \boldsymbol{\Omega}_k \mathbf{B}_k
+\end{aligned}
 \]</div>
-<p>(<span class="arithmatex">\(\mathbf{A}_k\)</span>, <span class="arithmatex">\(\mathbf{B}_k\)</span> は 2 つの姿勢に対する誤差のヤコビアン。転置の位置は論文によって書き方が異なります)
+<p>(<span class="arithmatex">\(\mathbf{A}_k\)</span>, <span class="arithmatex">\(\mathbf{B}_k\)</span> は 2 つの姿勢に対する誤差のヤコビアン、<span class="arithmatex">\(\boldsymbol{\Omega}_k\)</span> は 8.1 節の重み (共分散の和の逆行列)。転置の位置は論文によって書き方が異なります)
 演習 7 の <code>ScanFactor.linearize</code> が、これを numpy で書いたものです。</p>
-<h2 id="9-gpu-のちょっとした話">9. GPU のちょっとした話</h2>
+<h2 id="11-gpu-のちょっとした話">11. GPU のちょっとした話</h2>
 <p>GLIM の論文によれば、多数の VGICP 因子を線形化するとき、</p>
 <ul>
 <li>線形化点 (各姿勢の推定値) をまとめて 1 回で GPU に送り、</li>
@@ -186,34 +372,45 @@ VGICP の誤差関数 <span class="arithmatex">\(E(\mathbf{T}_i^{-1}\mathbf{T}_j
 </ul>
 <p>ことで、因子の数によらず CPU⇔GPU の転送を 2 回に抑えています。
 「計算そのもの」より「転送や同期」がボトルネックになりやすいのが GPU プログラミングの勘所です。</p>
-<h2 id="演習-3-4">演習 3, 4</h2>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex03_icp_2d.py<span class="w">      </span><span class="c1"># 点対点 ICP, 点対線 ICP, GICP の比較</span>
-python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">    </span><span class="c1"># ボクセル地図, 対応探索の速さ, マルチ解像度</span>
+<hr />
+<h2 id="演習-3a-3b-4">演習 3a, 3b, 4</h2>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>exercises/ex03a_matching_methods.py<span class="w">   </span><span class="c1"># この章の図: 前処理・ICP・NDT・GICP・VGICP・コストの形</span>
+python<span class="w"> </span>exercises/ex03b_icp_2d.py<span class="w">             </span><span class="c1"># 点対点 ICP・点対面 ICP・GICP を反復させて比較</span>
+python<span class="w"> </span>exercises/ex04_vgicp_2d.py<span class="w">            </span><span class="c1"># VGICP のボクセル地図、対応探索の速さ、マルチ解像度</span>
 </code></pre></div>
 <h2 id="理解度チェック">理解度チェック</h2>
 <ol>
-<li>点対点 ICP が LiDAR 点群で偏りやすいのはなぜ?</li>
-<li>GICP の <span class="arithmatex">\((\mathbf{C}'_k + \mathbf{R}\mathbf{C}_k\mathbf{R}^\top)^{-1}\)</span> は何を表している?</li>
-<li>NDT と VGICP は、どちらもボクセルごとに正規分布を持つ。違いは何?</li>
-<li>VGICP が GPU で速いのはなぜ?</li>
+<li>スキャンマッチングが繰り返し計算になるのはなぜ?</li>
+<li>点対点 ICP が LiDAR の点群で偏りやすいのはなぜ?</li>
+<li>NDT のボクセルの分布は何から作る? 点の少ないボクセルではどうなる?</li>
+<li>GICP の <span class="arithmatex">\((\mathbf{C}^{Q}_k + \mathbf{R}\mathbf{C}^{P}_k\mathbf{R}^\top)^{-1}\)</span> は何を表している? なぜ 2 つの共分散を足す?</li>
+<li>NDT と GICP の違いを、地図の表し方・ソース側の扱い・対応の探し方・コストの形の 4 点で説明せよ。</li>
+<li>NDT の谷が狭くなりやすいのはなぜ? どんな対策がある?</li>
+<li>VGICP は NDT と GICP のどこを受け継いでいる?</li>
 <li>「位置合わせの結果を因子にする」のと「位置合わせのコストを因子にする」のでは何が違う?</li>
 </ol>
 <details>
 <summary>答えの例</summary>
 <ol>
-<li>2 つのスキャンで表面上の同じ位置の点が取れているとは限らず、最近傍の点が少しずれた場所にあるため、面に沿う方向に余計な誤差が生じる。</li>
-<li>ソースの点の分布とターゲットの点の分布の差 (これも正規分布) の共分散の逆、つまり情報行列。面の法線方向の誤差を重く、面に沿う方向を軽く数える。</li>
-<li>NDT はボクセル内の点の座標から共分散を作るので点が少ないと不安定。VGICP は点ごとに近傍から求めた共分散を平均するので、点が少なくても分布が作れる。また VGICP はソース側の点の共分散も使う (分布対分布)。</li>
-<li>対応探索がボクセルの参照 1 回で済み、全点で同じ計算をするだけなので、分岐が少なく大量に並列化できる。</li>
+<li>対応 (どの点とどの点が同じ場所か) が分からず、対応を正しく決めるにはだいたい正しい <span class="arithmatex">\(\mathbf{T}\)</span> が必要だから。「対応を決める → <span class="arithmatex">\(\mathbf{T}\)</span> を更新する」を交互に繰り返す。</li>
+<li>2 つのスキャンで表面上の同じ位置の点が取れているとは限らず、最も近い点が少し横にずれた場所にあるため、面に沿う向きにも余計な誤差が生じる。</li>
+<li>ボクセル内の点の位置から平均と共分散を計算する。点が少ない (数点未満の) ボクセルでは分布を作れず、地図に穴が開く。</li>
+<li>ソースの点の分布とターゲットの点の分布の差の共分散の逆、つまり情報行列。2 つの不確かな位置の差の不確かさは、それぞれの共分散の和になるから。面の法線方向の誤差を重く、面に沿う方向を軽く数える。</li>
+<li>地図: NDT はボクセルごとの分布、GICP は点ごとの分布。ソース: NDT は点、GICP は分布。対応: NDT はボクセルを引く、GICP は kd-tree で最近傍点を探す。コスト: NDT はスコア (上限 1) の和の最大化、GICP はマハラノビス距離の 2 乗和の最小化。</li>
+<li>入ったボクセルの分布しか見ず、1 点あたりのスコアに上限があるので、正解から離れると手がかりがなくなるから。隣のボクセルも見る、粗いボクセルから段階的に合わせる、格子をずらして重ねる、良い初期値 (IMU など) を使う、などで対策する。</li>
+<li>NDT から: ボクセルで地図を区切り、対応を表引きで決める (速い、GPU 向き)。GICP から: 点ごとの共分散 (ボクセルの分布はその平均)、ソース側も分布、最小二乗のコスト。</li>
 <li>結果を因子にすると、相対姿勢の正規分布という要約で情報が失われる。コストを因子にすると、点ごとの誤差を最適化のたびに線形化し直すので、退化方向の扱いや複数フレームとの同時マッチングが自然にできる。</li>
 </ol>
 </details>
 <h2 id="もっと知りたい人へ">もっと知りたい人へ</h2>
 <ul>
+<li>P. J. Besl, N. D. McKay, "A Method for Registration of 3-D Shapes," IEEE TPAMI, 1992. (ICP)</li>
+<li>P. Biber, W. Straßer, "The Normal Distributions Transform: A New Approach to Laser Scan Matching," IROS 2003. (2D の NDT)</li>
+<li>M. Magnusson, "The Three-Dimensional Normal-Distributions Transform," 博士論文, Örebro University, 2009. (3D の NDT。PCL の実装のもと)</li>
 <li>A. Segal, D. Haehnel, S. Thrun, "Generalized-ICP," RSS 2009.</li>
 <li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Voxelized GICP for Fast and Accurate 3D Point Cloud Registration," ICRA 2021.</li>
-<li>K. Koide, M. Yokozuka, S. Oishi, A. Banno, "Globally Consistent 3D LiDAR Mapping with GPU-accelerated GICP Matching Cost Factors," IEEE RA-L, 2021.</li>
-<li>著者の実装: <a href="https://github.com/koide3/fast_gicp">fast_gicp</a>, <a href="https://github.com/koide3/small_gicp">small_gicp</a>, <a href="https://github.com/koide3/gtsam_points">gtsam_points</a></li>
+<li>K. Koide et al., "Globally Consistent 3D LiDAR Mapping with GPU-accelerated GICP Matching Cost Factors," IEEE RA-L, 2021.</li>
+<li>著者の実装: <a href="https://github.com/koide3/fast_gicp">fast_gicp</a>, <a href="https://github.com/koide3/small_gicp">small_gicp</a>, <a href="https://github.com/koide3/gtsam_points">gtsam_points</a>, <a href="https://github.com/koide3/ndt_omp">ndt_omp</a> (高速な NDT)</li>
 </ul>
 <label class="read-toggle"><input type="checkbox" id="read-toggle" data-slug="03_point_cloud_registration"> この章を読んだ</label>
 <nav class="pager" aria-label="前後の章"><a class="prev" href="02_probability_and_least_squares.html"><small>前へ</small>02 確率と最小二乗</a><a class="next" href="04_imu_and_preintegration.html"><small>次へ</small>04 IMU と事前積分</a></nav>

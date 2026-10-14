@@ -13,7 +13,8 @@ exercises:
 	$(PY) exercises/ex01_rotation.py
 	$(PY) exercises/ex02a_gaussian.py
 	$(PY) exercises/ex02b_least_squares.py
-	$(PY) exercises/ex03_icp_2d.py
+	$(PY) exercises/ex03a_matching_methods.py
+	$(PY) exercises/ex03b_icp_2d.py
 	$(PY) exercises/ex04_vgicp_2d.py
 	$(PY) exercises/ex05_imu.py
 	$(PY) exercises/ex06_factor_graph.py
